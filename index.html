@@ -1,47 +1,83 @@
 <html>
+	<head>
+		<link rel="stylesheet" href="assets/css/style.css" />
+		<link rel="stylesheet" href="assets/css/topbar.css" />
 
-<head>
-  <link rel="stylesheet" href="assets/css/style.css" />
-  <link rel="stylesheet" href="assets/css/topbar.css" />
+		<!-- <link rel="stylesheet" href="assets/css/no-topbar.css"> -->
+		<script defer src="assets/js/renderer.js"></script>
+		<meta charset="UTF-8" />
+		<title>Eyesee</title>
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="script-src 'self' 'unsafe-inline';"
+		/>
+	</head>
 
-  <!-- <link rel="stylesheet" href="assets/css/no-topbar.css"> -->
-  <script defer src="assets/js/renderer.js"></script>
-  <meta charset="UTF-8" />
-  <title>Eysee</title>
-  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
-</head>
+	<body>
+		<!-- URL Input Modal -->
+		<div id="url-modal" class="url-modal hidden">
+			<div class="url-modal-content">
+				<h3>Navigate to URL</h3>
+				<input
+					type="url"
+					id="url-input"
+					placeholder="Enter URL (e.g., https://example.com)"
+					autocomplete="url"
+				/>
+				<div class="url-modal-buttons">
+					<button type="button" class="cancel-btn" id="url-cancel">
+						Cancel
+					</button>
+					<button type="button" class="submit-btn" id="url-submit">Go</button>
+				</div>
+			</div>
+		</div>
 
-<body>
+		<!-- Webview -->
+		<!-- <webview
+			autosize="on"
+			src="http://10.217.172.20:3000"
+			id="webview"
+			data-home="http://10.217.172.20:3000"
+			style="
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100vw;
+				height: 100vh;
+				z-index: 10;
+				border: none;
+			"
+		></webview> -->
+		<webview
+			autosize="on"
+			src="http://192.168.100.113:3000"
+			id="webview"
+			data-home="http://192.168.100.113:3000"
+			style="
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100vw;
+				height: 100vh;
+				z-index: 10;
+				border: none;
+			"
+		></webview>
 
-  <!-- URL Input Modal -->
-  <div id="url-modal" class="url-modal hidden">
-    <div class="url-modal-content">
-      <h3>Navigate to URL</h3>
-      <input type="url" id="url-input" placeholder="Enter URL (e.g., https://example.com)" autocomplete="url" />
-      <div class="url-modal-buttons">
-        <button type="button" class="cancel-btn" id="url-cancel">Cancel</button>
-        <button type="button" class="submit-btn" id="url-submit">Go</button>
-      </div>
-    </div>
-  </div>
+		<script>
+			document.addEventListener('DOMContentLoaded', function () {
+				const webview = document.getElementById('webview');
+				if (webview) {
+					webview.addEventListener('dom-ready', function () {
+						webview.setZoomFactor(0.7);
+					});
+				}
+			});
+		</script>
 
-  <!-- Webview -->
-  <webview autosize="on" src="http://0.0.0.0:3000" id="webview" data-home="http://0.0.0.0:3000"
-    style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 10; border: none;"></webview>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const webview = document.getElementById('webview');
-      if (webview) {
-        webview.addEventListener('dom-ready', function () {
-          webview.setZoomFactor(0.7);
-        });
-      }
-    });
-  </script>
-
-  <!-- HTML -->
-  <!--
+		<!-- HTML -->
+		<!--
     <h1>Hello world!</h1>
     <p>
       Lorem ipsum dolor sit amet consectetur adipisicing elit. Modi, voluptatum
@@ -49,6 +85,5 @@
       sunt dolor quidem cum? Natus dolore ipsum illum numquam molestiae?
     </p>
     -->
-</body>
-
+	</body>
 </html>
