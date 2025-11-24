@@ -20,6 +20,9 @@ export class PerformanceController {
 		this.memoryManager = new MemoryManager();
 		this.performanceMonitor = new PerformanceMonitor();
 		this.resourceManager = new ResourceManager();
+		this.webviewPool = new WebviewPool();
+		this.prerenderer = new Prerenderer();
+		this.advancedCache = new AdvancedCache();
 		this.isInitialized = false;
 	}
 
@@ -47,6 +50,16 @@ export class PerformanceController {
 			await this.resourceManager.initialize();
 			console.log('✓ Resource manager initialized');
 
+			// Initialize Phase 2 modules
+			await this.webviewPool.initialize();
+			console.log('✓ Webview pool initialized');
+
+			await this.prerenderer.initialize();
+			console.log('✓ Prerenderer initialized');
+
+			await this.advancedCache.initialize();
+			console.log('✓ Advanced cache initialized');
+
 			this.isInitialized = true;
 			console.log('✓ All performance modules initialized successfully');
 
@@ -57,7 +70,6 @@ export class PerformanceController {
 			throw error;
 		}
 	}
-
 	/**
 	 * Start periodic performance checks and cleanup
 	 */

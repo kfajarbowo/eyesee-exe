@@ -55,7 +55,6 @@ const isValidUrl = string => {
 		new URL(string);
 		return true;
 	} catch (_) {
-		// Try adding https:// if no protocol specified
 		try {
 			new URL('https://' + string);
 			return true;
@@ -229,8 +228,95 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 		// Make performance controller globally available
 		window.performanceController = performanceController;
+
+		// Initialize Phase 2 features
+		await initializePhase2Features();
 	} catch (error) {
 		console.error('Failed to initialize performance modules:', error);
+	}
+
+	// Initialize Phase 2 features
+	async function initializePhase2Features() {
+		console.log('Initializing Phase 2 features...');
+
+		// Get webview pool and prerenderer from performance controller
+		const webviewPool = performanceController.webviewPool;
+		const prerenderer = performanceController.prerenderer;
+		const advancedCache = performanceController.advancedCache;
+
+		// Preload frequently used URLs
+		const frequentUrls = [
+			'http://192.168.100.113:3000/dashboard',
+			'http://192.168.100.113:3000/profile',
+			'http://192.168.100.113:3000/settings',
+		];
+
+		// Start preloading in background
+		webviewPool.preloadFrequentUrls(frequentUrls);
+		prerenderer.preloadFrequentUrls(frequentUrls);
+
+		// Setup smart navigation with webview pool and prerendering
+		window.smartNavigate = async url => {
+			console.log('Smart navigating to:', url);
+
+			// Try to get prerendered content first
+			const prerendered = prerenderer.getPrerenderedContent(url);
+			if (prerendered) {
+				const webview = webviewPool.getWebview();
+
+				// Apply prerendered content
+				const applied = await prerenderer.applyPrerenderedContent(webview, url);
+				if (applied) {
+					webview.style.display = '';
+					webview.style.left = '0';
+					webview.style.top = '0';
+					console.log('Navigation completed with prerendered content');
+				} else {
+					// Fallback to normal navigation
+					webview.src = url;
+					webview.style.display = '';
+					webview.style.left = '0';
+					webview.style.top = '0';
+				}
+
+				return webview;
+			}
+
+			// Try to get from webview pool
+			const pooledWebview = webviewPool.getPreloadedWebview(url);
+			if (pooledWebview) {
+				pooledWebview.src = url;
+				pooledWebview.style.display = '';
+				pooledWebview.style.left = '0';
+				pooledWebview.style.top = '0';
+				console.log('Navigation completed with pooled webview');
+				return pooledWebview;
+			}
+
+			// Create new webview as fallback
+			const webview = webviewPool.getWebview();
+			webview.src = url;
+			webview.style.display = '';
+			webview.style.left = '0';
+			webview.style.top = '0';
+
+			console.log('Navigation completed with new webview');
+			return webview;
+		};
+
+		// Setup cache warming for critical resources
+		window.warmCache = async resources => {
+			console.log('Warming cache for resources:', resources);
+
+			for (const resource of resources) {
+				await advancedCache.set(resource.url, resource.data, {
+					priority: 'high',
+					ttl: 60 * 60 * 1000, // 1 hour
+				});
+			}
+		};
+
+		console.log('Phase 2 features initialized');
 	}
 
 	// Show loading screen only on first load
