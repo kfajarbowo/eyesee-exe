@@ -23,5 +23,9 @@
   "devDependencies": {
     "electron": "^38.0.0",
     "electron-installer-dmg": "^5.0.0"
+  },
+  "dependencies": {
+    "electron-store": "^11.0.2",
+    "node-machine-id": "^1.1.12"
   }
 }

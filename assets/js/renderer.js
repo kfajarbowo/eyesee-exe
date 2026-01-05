@@ -27,6 +27,25 @@ const getControlsHeight = () => {
 // 	document.body.appendChild(loadingScreen);
 // };
 
+const showLoadingScreen = () => {
+	if (document.querySelector('#loading-screen')) {
+		return;
+	}
+
+	const loadingScreen = document.createElement('div');
+	loadingScreen.id = 'loading-screen';
+	loadingScreen.className = 'loading-screen';
+	loadingScreen.innerHTML = `
+		<div class="loading-content">
+			<div class="loading-spinner"></div>
+			<h2>Loading...</h2>
+			<p>Please wait while the page loads</p>
+		</div>
+	`;
+
+	document.body.appendChild(loadingScreen);
+};
+
 // Light loading indicator for faster navigation
 const showLightLoading = () => {
 	// Check if loading indicator already exists
@@ -163,8 +182,9 @@ const calculateLayoutSize = () => {
 	const webview = document.querySelector('webview');
 	if (!webview) return;
 
-	const windowWidth = document.documentElement.clientWidth;
-	const windowHeight = document.documentElement.clientHeight;
+	// Gunakan window.innerWidth dan innerHeight untuk akurasi lebih baik
+	const windowWidth = window.innerWidth;
+	const windowHeight = window.innerHeight;
 	const controlsHeight = getControlsHeight();
 	const webviewHeight = windowHeight - controlsHeight;
 
@@ -348,6 +368,29 @@ window.addEventListener('DOMContentLoaded', async () => {
 			}
 		}, 2000);
 	});
+
+	// Listen for window state changes from main process
+	if (window.electron) {
+		// Handle window state changes
+		const cleanupWindowStateChanged = window.electron.onWindowStateChanged(
+			(event, state) => {
+				console.log('Window state changed:', state);
+				calculateLayoutSize();
+			}
+		);
+
+		// Handle window resize
+		const cleanupWindowResized = window.electron.onWindowResized(() => {
+			console.log('Window resized');
+			calculateLayoutSize();
+		});
+
+		// Store cleanup functions for proper event listener removal
+		window.eventCleanupFunctions = window.eventCleanupFunctions || {};
+		window.eventCleanupFunctions.cleanupWindowStateChanged =
+			cleanupWindowStateChanged;
+		window.eventCleanupFunctions.cleanupWindowResized = cleanupWindowResized;
+	}
 
 	// Listen for navigation events from menu bar
 	if (window.electron) {

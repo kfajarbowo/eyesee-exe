@@ -6,6 +6,8 @@ exports.createBrowserWindow = () => {
 	const win = new BrowserWindow({
 		width: 1024,
 		height: 768,
+		minWidth: 800,
+		minHeight: 600,
 		icon: path.join(__dirname, '../assets/icons/png/logo-eyesee.png'),
 		show: false, // Don't show window until ready
 		backgroundColor: '#fff', // Prevent white flash

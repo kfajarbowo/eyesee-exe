@@ -13,7 +13,7 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: radial-gradient(circle at top, #14d8ff 0%, #00a3c4 35%, #00232f 100%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -212,4 +212,15 @@ body {
     transform: translateY(0);
     opacity: 1;
   }
+}
+
+/* Webview Styling for Responsive Design */
+webview {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  border: none;
+  outline: none;
 }

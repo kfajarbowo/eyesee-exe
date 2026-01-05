@@ -5,6 +5,17 @@
 This is a simple Electron application to create a webview.
 
 Features:
+# Lihat status license saat ini
+node tools/license-admin.js --status
+# Hapus/reset license (untuk testing)
+node tools/license-admin.js --reset
+# Lihat Hardware ID
+node tools/license-admin.js --hardware
+# Lihat lokasi file license
+node tools/license-admin.js --path
+
+# 1. Generate license key
+node tools/license-generator.js --expiry 2025-12-31
 
 - Responsive window
 - Remember the window dimensions when reopening

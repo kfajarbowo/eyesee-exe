@@ -1,28 +1,80 @@
 // Electron
-const { app, Menu, ipcMain, dialog } = require('electron');
+const { app, Menu, ipcMain, dialog, BrowserWindow } = require('electron');
+const path = require('path');
+
+// License system
+const { licenseManager, LicenseStatus } = require('./src/license');
 
 let mainWindow;
+let licenseWindow;
 
-// Handle app ready with error handling
-app.whenReady().then(() => {
-	// Main window
-	// mainWindow.setIcon(path.join(__dirname, 'assets/icons/png/logo-eyesee.png'));
+/**
+ * Create the license activation window
+ */
+function createLicenseWindow() {
+	const window = require('./src/window');
+	
+	licenseWindow = new BrowserWindow({
+		width: 480,
+		height: 600,
+		resizable: false,
+		minimizable: false,
+		maximizable: false,
+		fullscreenable: false,
+		icon: path.join(__dirname, 'assets/icons/png/logo-eyesee.png'),
+		show: false,
+		backgroundColor: '#667eea',
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false,
+			preload: path.join(__dirname, 'preload.js')
+		}
+	});
+
+	licenseWindow.loadFile('license-dialog.html');
+	
+	licenseWindow.once('ready-to-show', () => {
+		licenseWindow.show();
+	});
+
+	// Remove menu for license window
+	licenseWindow.setMenu(null);
+
+	licenseWindow.on('closed', () => {
+		licenseWindow = null;
+		// If license window is closed without activation, quit the app
+		if (!mainWindow) {
+			app.quit();
+		}
+	});
+}
+
+/**
+ * Create the main application window
+ */
+function createMainWindow() {
 	const window = require('./src/window');
 	mainWindow = window.createBrowserWindow();
 
-	// Option 1: Uses Webtag and load a custom html file with external content
+	// Add event listeners for window state changes
+	mainWindow.on('maximize', () => {
+		mainWindow.webContents.send('window-state-changed', 'maximized');
+	});
+
+	mainWindow.on('unmaximize', () => {
+		mainWindow.webContents.send('window-state-changed', 'unmaximized');
+	});
+
+	mainWindow.on('restore', () => {
+		mainWindow.webContents.send('window-state-changed', 'restored');
+	});
+
+	mainWindow.on('resize', () => {
+		mainWindow.webContents.send('window-resized');
+	});
+
+	// Load the main content
 	mainWindow.loadFile('index.html');
-	//mainWindow.loadURL(`file://${__dirname}/index.html`);
-
-	// Option 2: Load directly an URL if you don't need interface customization
-	//mainWindow.loadURL("https://github.com");
-
-	// Option 3: Uses BrowserView to load an URL
-	//const view = require("./src/view");
-	//view.createBrowserView(mainWindow);
-
-	// Display Dev Tools
-	//mainWindow.openDevTools();
 
 	// Menu (for standard keyboard shortcuts)
 	const menu = require('./src/menu');
@@ -33,25 +85,180 @@ app.whenReady().then(() => {
 	// Print function (if enabled)
 	require('./src/print');
 
-	// Optimize app performance
+	// Check for license reminders after window loads
+	mainWindow.webContents.on('did-finish-load', () => {
+		const reminder = licenseManager.getReminder();
+		if (reminder) {
+			mainWindow.webContents.send('license-reminder', reminder);
+		}
+	});
+
+	mainWindow.on('closed', () => {
+		mainWindow = null;
+	});
+}
+
+/**
+ * Initialize the application with license check
+ */
+async function initializeApp() {
+	try {
+		// Initialize license manager
+		licenseManager.initialize();
+
+		// Validate license
+		const validation = licenseManager.validateLicense();
+		console.log('License validation:', validation.status, validation.message);
+
+		if (licenseManager.isLicensed()) {
+			// License is valid, create main window
+			createMainWindow();
+
+			// Show reminder if applicable
+			if (validation.status === LicenseStatus.GRACE_PERIOD) {
+				dialog.showMessageBox(mainWindow, {
+					type: 'warning',
+					title: 'Lisensi Expired',
+					message: validation.message,
+					buttons: ['OK']
+				});
+			}
+		} else {
+			// License is not valid, show license dialog
+			if (validation.status === LicenseStatus.CLOCK_MANIPULATED) {
+				dialog.showErrorBox('Error', validation.message);
+				app.quit();
+				return;
+			}
+
+			createLicenseWindow();
+		}
+	} catch (error) {
+		console.error('Failed to initialize app:', error);
+		dialog.showErrorBox('Error', 'Gagal menginisialisasi aplikasi. Silakan coba lagi.');
+		app.quit();
+	}
+}
+
+// Handle app ready
+app.whenReady().then(() => {
+	initializeApp();
+
 	// Prevent app from hanging when all windows are closed
 	app.on('window-all-closed', () => {
-		// On macOS, keep app running even when all windows are closed
 		if (process.platform !== 'darwin') {
 			app.quit();
 		}
 	});
 
 	app.on('activate', () => {
-		// On macOS, re-create window when dock icon is clicked
 		if (BrowserWindow.getAllWindows().length === 0) {
-			mainWindow = window.createBrowserWindow();
-			mainWindow.loadFile('index.html');
+			initializeApp();
 		}
 	});
 });
 
-// IPC handlers for URL navigation
+// ============================================================
+// License IPC Handlers
+// ============================================================
+
+// Activate license
+ipcMain.handle('activate-license', async (event, licenseKey) => {
+	const result = licenseManager.activateLicense(licenseKey);
+	return result;
+});
+
+// Get license info
+ipcMain.handle('get-license-info', async () => {
+	return licenseManager.getLicenseInfo();
+});
+
+// Get license reminder
+ipcMain.handle('get-license-reminder', async () => {
+	return licenseManager.getReminder();
+});
+
+// Show license info dialog (from Help menu)
+ipcMain.on('show-license-info', async () => {
+	if (!mainWindow) return;
+	
+	try {
+		const info = licenseManager.getLicenseInfo();
+		
+		let statusText = '';
+		switch (info.status) {
+			case 'valid':
+				statusText = '✅ AKTIF';
+				break;
+			case 'grace_period':
+				statusText = '⚠️ MASA TENGGANG';
+				break;
+			case 'expired':
+				statusText = '❌ EXPIRED';
+				break;
+			case 'not_activated':
+				statusText = '🔒 BELUM AKTIVASI';
+				break;
+			default:
+				statusText = info.status.toUpperCase();
+		}
+		
+		let details = `Status: ${statusText}\n`;
+		
+		if (info.expiryDate) {
+			details += `\nTanggal Expired: ${info.expiryDate.toLocaleDateString('id-ID', {
+				weekday: 'long',
+				year: 'numeric',
+				month: 'long',
+				day: 'numeric'
+			})}`;
+		}
+		
+		if (info.daysUntilExpiry !== null) {
+			if (info.daysUntilExpiry > 0) {
+				details += `\nSisa Waktu: ${info.daysUntilExpiry} hari`;
+			} else if (info.daysUntilExpiry < 0) {
+				details += `\nExpired: ${Math.abs(info.daysUntilExpiry)} hari lalu`;
+			}
+		}
+		
+		if (info.gracePeriodRemaining !== null) {
+			details += `\nSisa Grace Period: ${info.gracePeriodRemaining} hari`;
+		}
+		
+		details += `\n\nHardware ID: ${info.hardwareId}`;
+		
+		dialog.showMessageBox(mainWindow, {
+			type: info.status === 'valid' ? 'info' : 'warning',
+			title: 'Informasi Lisensi',
+			message: 'EyeSee License',
+			detail: details,
+			buttons: ['OK']
+		});
+		
+	} catch (error) {
+		dialog.showErrorBox('Error', 'Gagal memuat informasi lisensi.');
+	}
+});
+
+// Deactivate license
+ipcMain.handle('deactivate-license', async () => {
+	return licenseManager.deactivateLicense();
+});
+
+// License activated - close license window and open main window
+ipcMain.handle('license-activated', async () => {
+	if (licenseWindow) {
+		licenseWindow.close();
+	}
+	createMainWindow();
+	return { success: true };
+});
+
+// ============================================================
+// URL Navigation IPC Handlers
+// ============================================================
+
 ipcMain.handle('navigate-to-url', async (event, url) => {
 	if (mainWindow) {
 		mainWindow.webContents.send('navigate-webview', url);
@@ -59,10 +266,10 @@ ipcMain.handle('navigate-to-url', async (event, url) => {
 });
 
 ipcMain.handle('show-url-dialog', async () => {
-	// Send message to renderer to show the modal
-	mainWindow.webContents.send('show-url-input-modal');
+	if (mainWindow) {
+		mainWindow.webContents.send('show-url-input-modal');
+	}
 
-	// Return a promise that resolves when the user submits the URL
 	return new Promise(resolve => {
 		ipcMain.once('url-input-response', (event, url) => {
 			resolve(url);
@@ -70,12 +277,14 @@ ipcMain.handle('show-url-dialog', async () => {
 	});
 });
 
-// Handle URL input response from renderer
 ipcMain.on('url-input-response', (event, url) => {
-	// This will be handled by the promise above
+	// Handled by the promise above
 });
 
-// Handle batch operations for better performance
+// ============================================================
+// Batch Operations IPC Handler
+// ============================================================
+
 ipcMain.handle('batch-operations', async (event, operations) => {
 	const results = [];
 	for (const operation of operations) {
@@ -123,56 +332,49 @@ ipcMain.handle('batch-operations', async (event, operations) => {
 	return results;
 });
 
-// Handle performance metrics request
+// ============================================================
+// Performance Monitoring IPC Handlers
+// ============================================================
+
 ipcMain.handle('get-performance-metrics', async () => {
 	if (!mainWindow) return null;
 
-	const metrics = {
+	return {
 		memoryUsage: process.memoryUsage(),
-		webContentsMetrics: mainWindow.webContents.getPerformanceMetrics(),
 		cpuUsage: process.cpuUsage(),
 	};
-
-	return metrics;
 });
 
-// Handle performance metric reporting
 ipcMain.on('report-performance-metric', (event, metric) => {
 	console.log('Performance metric:', metric);
-	// Store metrics for analytics
-	// Could send to external analytics service here
 });
 
 ipcMain.on('report-performance-metrics', (event, metrics) => {
 	console.log('Performance metrics batch:', metrics);
-	// Store metrics for analytics
 });
 
 ipcMain.on('report-slow-resource', (event, resource) => {
 	console.warn('Slow resource detected:', resource);
-	// Could track slow resources for optimization
 });
 
 ipcMain.on('report-memory-usage', (event, memory) => {
 	console.log('Memory usage:', memory);
-	// Could track memory usage patterns
 });
 
 ipcMain.on('report-error', (event, error) => {
 	console.error('Error reported:', error);
-	// Could send to error tracking service
 });
 
-// Handle memory management
+// ============================================================
+// Memory Management IPC Handlers
+// ============================================================
+
 ipcMain.handle('get-memory-info', async () => {
 	if (!mainWindow) return null;
 
 	try {
-		const webContents = mainWindow.webContents;
-
 		return {
 			process: process.memoryUsage(),
-			webview: await webContents.getPerformanceMetrics(),
 		};
 	} catch (error) {
 		console.error('Error getting memory info:', error);
@@ -186,7 +388,6 @@ ipcMain.handle('force-memory-cleanup', async () => {
 	try {
 		const webContents = mainWindow.webContents;
 
-		// Force garbage collection
 		await webContents.executeJavaScript(`
 			if (window.gc) {
 				window.gc();
@@ -194,7 +395,6 @@ ipcMain.handle('force-memory-cleanup', async () => {
 			}
 		`);
 
-		// Clear caches
 		await webContents.executeJavaScript(`
 			if (window.caches) {
 				caches.keys().then(cacheNames => {
@@ -212,14 +412,16 @@ ipcMain.handle('force-memory-cleanup', async () => {
 	}
 });
 
-// Handle resource management
+// ============================================================
+// Resource Management IPC Handlers
+// ============================================================
+
 ipcMain.handle('get-resource-stats', async () => {
 	if (!mainWindow) return null;
 
 	try {
 		const webContents = mainWindow.webContents;
 
-		// Get resource statistics
 		const stats = await webContents.executeJavaScript(`
 			const resources = performance.getEntriesByType('resource');
 			const stats = {
@@ -262,9 +464,7 @@ ipcMain.handle('force-resource-cleanup', async () => {
 	try {
 		const webContents = mainWindow.webContents;
 
-		// Cleanup resources
 		await webContents.executeJavaScript(`
-			// Clear caches
 			if (window.caches) {
 				caches.keys().then(cacheNames => {
 					return Promise.all(
@@ -273,7 +473,6 @@ ipcMain.handle('force-resource-cleanup', async () => {
 				});
 			}
 			
-			// Clear storage
 			if (window.localStorage) {
 				const keysToRemove = [];
 				for (let i = 0; i < localStorage.length; i++) {
@@ -285,7 +484,6 @@ ipcMain.handle('force-resource-cleanup', async () => {
 				keysToRemove.forEach(key => localStorage.removeItem(key));
 			}
 			
-			// Clear session storage
 			if (window.sessionStorage) {
 				sessionStorage.clear();
 			}
@@ -298,9 +496,11 @@ ipcMain.handle('force-resource-cleanup', async () => {
 	}
 });
 
-// Optimize memory usage
+// ============================================================
+// App Lifecycle
+// ============================================================
+
 app.on('before-quit', () => {
-	// Clean up resources before quitting
 	if (mainWindow) {
 		mainWindow.removeAllListeners();
 	}
@@ -310,7 +510,6 @@ app.on('before-quit', () => {
 app.on(
 	'certificate-error',
 	(event, webContents, url, error, certificate, callback) => {
-		// In development, ignore certificate errors
 		if (process.env.NODE_ENV === 'development') {
 			event.preventDefault();
 			callback(true);

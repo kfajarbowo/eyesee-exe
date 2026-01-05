@@ -36,9 +36,9 @@
 		<!-- Webview -->
 		<!-- <webview
 			autosize="on"
-			src="http://10.217.172.20:3000"
+			src="http://10.170.83.20:3000"
 			id="webview"
-			data-home="http://10.217.172.20:3000"
+			data-home="http://10.170.83.20:3000"
 			style="
 				position: fixed;
 				top: 0;
@@ -49,22 +49,15 @@
 				border: none;
 			"
 		></webview> -->
-		<!-- <webview
-			autosize="on"
-			src="http://10.134.179.20:3000"
-			id="webview"
-			data-home="http://10.134.179.20:3000"
-			style="
-				position: fixed;
-				top: 0;
-				left: 0;
-				width: 100vw;
-				height: 100vh;
-				z-index: 10;
-				border: none;
-			"
-		></webview> -->
+
+		<!-- IP Spero -->
 		<webview
+			src="http://192.168.100.113:3000"
+			id="webview"
+			data-home="http://192.168.100.113:3000"
+		></webview>
+		<!-- IP Server -->
+		<!-- <webview
 			autosize="on"
 			src="http://192.168.204.103:3000"
 			id="webview"
@@ -78,18 +71,7 @@
 				z-index: 10;
 				border: none;
 			"
-		></webview>
-
-		<script>
-			document.addEventListener('DOMContentLoaded', function () {
-				const webview = document.getElementById('webview');
-				if (webview) {
-					webview.addEventListener('dom-ready', function () {
-						webview.setZoomFactor(0.7);
-					});
-				}
-			});
-		</script>
+		></webview> -->
 
 		<!-- HTML -->
 		<!--
