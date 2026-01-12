@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:;"
+		/>
+		<title>VComm</title>
+		<link rel="stylesheet" href="assets/css/topbar.css" />
+	</head>
+	<body>
+		<!-- <webview
+			src="http://localhost:5000/"
+			data-home="http://localhost:5000/"
+		></webview> -->
+		<webview
+			src="http://192.168.204.105:5000/"
+			data-home="http://192.168.204.105:5000/"
+			allowpopups
+			webpreferences="allowRunningInsecureContent=true,webSecurity=false"
+		></webview>
+
+		<script src="assets/js/renderer.js"></script>
+	</body>
+</html>

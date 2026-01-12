@@ -17,6 +17,8 @@ node tools/license-admin.js --path
 # 1. Generate license key
 node tools/license-generator.js --expiry 2025-12-31
 
+node tools/license-generator.js --hardware <HW_ID> --expiry 2026-12-31
+
 - Responsive window
 - Remember the window dimensions when reopening
 - Menu & keyboard shortcuts for MacOs

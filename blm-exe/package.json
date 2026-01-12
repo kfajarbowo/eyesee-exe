@@ -1,0 +1,33 @@
+{
+  "name": "blm-webview",
+  "productName": "BLM Webview Application",
+  "version": "1.0.0",
+  "description": "Battle Logstic Management Webview Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "node build.js",
+    "package-mac": "electron-packager . --overwrite --platform=darwin --arch=x64 --icon=assets/icons/mac/icon.icns --prune=true --out=release-builds",
+    "package-win": "electron-packager . --overwrite --asar=true --platform=win32 --arch=x64 --icon=assets/icons/win/icon.ico --prune=true --out=release-builds --version-string.CompanyName=BLM --version-string.FileDescription=BLM --version-string.ProductName=\"BLM\"",
+    "package-linux": "electron-packager . --overwrite --platform=linux --arch=x64 --icon=assets/icons/png/1024x1024.png --prune=true --out=release-builds",
+    "create-installer-mac": "electron-installer-dmg ./release-builds/BLM\\ webview-darwin-x64/BLM\\ webview.app blm-webview --out=release-builds --overwrite --icon=assets/icons/mac/icon.icns"
+  },
+  "keywords": [
+    "electron",
+    "webview",
+    "blm",
+    "logistics"
+  ],
+  "author": "BLM Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-installer-dmg": "^3.0.0",
+    "electron-packager": "^17.1.1"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "node-machine-id": "^1.1.12"
+  }
+}

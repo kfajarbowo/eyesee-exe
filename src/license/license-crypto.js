@@ -19,12 +19,6 @@ const CONFIG = {
     ENCRYPTION_ALGORITHM: 'aes-256-gcm',
     IV_LENGTH: 16,
     AUTH_TAG_LENGTH: 16,
-    
-    // License key format: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX (6 segments)
-    // Seg 1-2: Product code + random
-    // Seg 3: Expiry date
-    // Seg 4-5: Hardware ID (8 chars encoded)
-    // Seg 6: Checksum
     KEY_SEGMENTS: 6,
     SEGMENT_LENGTH: 4,
     CHARSET: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
