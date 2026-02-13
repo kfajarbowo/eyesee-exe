@@ -12,6 +12,10 @@
 
 require('dotenv').config();
 
+// Validate environment variables before starting
+const { validateEnvironment } = require('./scripts/validate-env');
+validateEnvironment();
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
