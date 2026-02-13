@@ -12,7 +12,7 @@
         <!-- Logo and Title -->
         <div class="license-header">
             <div class="logo-container">
-                <img src="assets/icons/png/icon-vcomm.png" alt="VComm" class="logo" onerror="this.style.display='none'">
+                <img src="assets/icons/png/logo-vcomm.png" alt="VComm" class="logo" onerror="this.style.display='none'">
             </div>
             <h1 class="title">VComm Application</h1>
             <p class="subtitle">Aktivasi Lisensi</p>
@@ -20,17 +20,17 @@
 
         <!-- License Input Form -->
         <div class="license-form" id="license-form">
-        <div class="input-group">
+            <div class="input-group">
                 <label for="license-key">License Key</label>
                 <input 
                     type="text" 
                     id="license-key" 
-                    placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
-                    maxlength="29"
+                    placeholder="XXXX-XXXX-XXXX-XXXX"
+                    maxlength="19"
                     autocomplete="off"
                     spellcheck="false"
                 >
-                <div class="input-hint" id="input-hint">Masukkan license key yang valid (6 segmen)</div>
+                <div class="input-hint" id="input-hint">Masukkan license key yang valid (4 segmen)</div>
             </div>
 
             <div class="error-message" id="error-message"></div>
@@ -57,52 +57,13 @@
                     </svg>
                 </button>
             </div>
-            <p class="hardware-hint">Berikan Hardware ID ini ke admin untuk mendapatkan license key.</p>
+            <p class="hardware-hint">Hardware ID akan dikirim ke server saat aktivasi.</p>
         </div>
 
         <!-- Footer -->
         <div class="license-footer">
             <p>Butuh bantuan? Hubungi administrator.</p>
         </div>
-    </div>
-
-    <!-- License Info Modal (untuk lisensi yang sudah ada) -->
-    <div class="modal" id="license-info-modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Informasi Lisensi</h2>
-                <button type="button" class="modal-close" id="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="info-row">
-                    <span class="info-label">Status:</span>
-                    <span class="info-value" id="info-status">-</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Tanggal Expired:</span>
-                    <span class="info-value" id="info-expiry">-</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Sisa Hari:</span>
-                    <span class="info-value" id="info-days">-</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Hardware ID:</span>
-                    <span class="info-value" id="info-hardware">-</span>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" id="btn-deactivate">Hapus Lisensi</button>
-                <button type="button" class="btn-primary" id="btn-close-modal">Tutup</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Reminder Banner -->
-    <div class="reminder-banner" id="reminder-banner" style="display: none;">
-        <div class="reminder-icon">⚠️</div>
-        <div class="reminder-text" id="reminder-text"></div>
-        <button type="button" class="reminder-close" id="reminder-close">&times;</button>
     </div>
 
     <script>
@@ -116,17 +77,14 @@
             const hardwareIdElement = document.getElementById('hardware-id');
             const btnCopy = document.getElementById('btn-copy');
             const inputHint = document.getElementById('input-hint');
-            const reminderBanner = document.getElementById('reminder-banner');
-            const reminderText = document.getElementById('reminder-text');
-            const reminderClose = document.getElementById('reminder-close');
 
-            // Format license key as user types (6 segments)
+            // Format license key as user types (4 segments)
             licenseKeyInput.addEventListener('input', function(e) {
                 let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
                 let formatted = '';
                 
-                // 6 segments x 4 chars = 24 chars max
-                for (let i = 0; i < value.length && i < 24; i++) {
+                // 4 segments x 4 chars = 16 chars max
+                for (let i = 0; i < value.length && i < 16; i++) {
                     if (i > 0 && i % 4 === 0) {
                         formatted += '-';
                     }
@@ -138,12 +96,12 @@
                 // Clear messages when typing
                 hideMessages();
                 
-                // Validate format (6 segments = 29 chars with dashes)
-                if (formatted.length === 29) {
+                // Validate format (4 segments = 19 chars with dashes)
+                if (formatted.length === 19) {
                     inputHint.textContent = '✓ Format valid';
                     inputHint.className = 'input-hint valid';
                 } else {
-                    inputHint.textContent = 'Masukkan license key yang valid (6 segmen)';
+                    inputHint.textContent = 'Masukkan license key yang valid (4 segmen)';
                     inputHint.className = 'input-hint';
                 }
             });
@@ -152,8 +110,8 @@
             btnActivate.addEventListener('click', async function() {
                 const licenseKey = licenseKeyInput.value.trim();
                 
-                if (licenseKey.length !== 29) {
-                    showError('Format license key tidak valid. Gunakan format: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX');
+                if (licenseKey.length !== 19) {
+                    showError('Format license key tidak valid. Gunakan format: XXXX-XXXX-XXXX-XXXX');
                     return;
                 }
                 
@@ -199,11 +157,6 @@
                 }
             });
 
-            // Close reminder banner
-            reminderClose.addEventListener('click', function() {
-                reminderBanner.style.display = 'none';
-            });
-
             // Enter key to submit
             licenseKeyInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
@@ -235,14 +188,6 @@
                 btnActivate.querySelector('.btn-loading').style.display = loading ? 'inline-flex' : 'none';
             }
 
-            function showReminder(reminder) {
-                if (reminder) {
-                    reminderText.textContent = reminder.message;
-                    reminderBanner.className = 'reminder-banner ' + reminder.severity;
-                    reminderBanner.style.display = 'flex';
-                }
-            }
-
             // Initialize - get hardware ID
             async function initialize() {
                 try {
@@ -250,12 +195,8 @@
                     
                     if (info && info.hardwareId) {
                         hardwareIdElement.textContent = info.hardwareId;
-                    }
-                    
-                    // Check for reminder
-                    const reminder = await window.electron.getLicenseReminder();
-                    if (reminder) {
-                        showReminder(reminder);
+                    } else {
+                        hardwareIdElement.textContent = 'Tidak dapat memuat Hardware ID';
                     }
                 } catch (error) {
                     console.error('Failed to get license info:', error);
@@ -263,7 +204,6 @@
                 }
             }
 
-         
             initialize();
         })();
     </script>

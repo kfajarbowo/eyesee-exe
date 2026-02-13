@@ -1,13 +1,8 @@
 /**
- * License Manager Module
- * Main entry point for license validation and management.
+ * License Manager Module (Post-binding)
  * 
- * Features:
- * - License key validation with expiry checking
- * - Hardware binding (pre-binding - Hardware ID embedded in key)
- * - Clock manipulation detection
- * - Grace period handling (7 days)
- * - Expiry reminders (30, 14, 7 days)
+ * Main entry point for license validation and management.
+ * Validation is now primarily server-based.
  * 
  * @module license/license-manager
  */
@@ -15,371 +10,331 @@
 const { getHardwareId, getHardwareDetails } = require('./hardware-id');
 const { validateLicenseKey } = require('./license-crypto');
 const { licenseStorage } = require('./license-storage');
+const serverClient = require('./license-server-client');
 
-/**
- * Configuration
- */
+// ============================================================================
+// Configuration
+// ============================================================================
+
 const CONFIG = {
-    // Grace period after expiry (in days)
-    GRACE_PERIOD_DAYS: 7,
-    
-    // Reminder periods before expiry (in days)
-    REMINDER_DAYS: [30, 14, 7],
-    
-    // Clock manipulation tolerance (1 hour in ms)
-    CLOCK_TOLERANCE_MS: 3600000
+    SERVER_URL: 'http://127.0.0.1:3000',
+    OFFLINE_TOLERANCE_HOURS: 24
 };
 
-/**
- * License status enumeration
- */
+// ============================================================================
+// License Status Enum
+// ============================================================================
+
 const LicenseStatus = {
     VALID: 'valid',
-    EXPIRED: 'expired',
-    GRACE_PERIOD: 'grace_period',
+    REVOKED: 'revoked',
     INVALID_KEY: 'invalid_key',
-    HARDWARE_MISMATCH: 'hardware_mismatch',
-    CLOCK_MANIPULATED: 'clock_manipulated',
-    NOT_ACTIVATED: 'not_activated'
+    KEY_ALREADY_USED: 'key_already_used',
+    NOT_ACTIVATED: 'not_activated',
+    OFFLINE_VALID: 'offline_valid',
+    OFFLINE_EXPIRED: 'offline_expired',
+    SERVER_ERROR: 'server_error'
 };
 
-/**
- * License Manager class
- * Handles all license operations
- */
+// ============================================================================
+// License Manager Class
+// ============================================================================
+
 class LicenseManager {
     constructor() {
         this.initialized = false;
         this.currentStatus = null;
         this.licenseData = null;
     }
-
-    /**
-     * Initialize the license manager
-     */
-    initialize() {
-        if (this.initialized) {
-            return;
-        }
-
+    
+    initialize(serverUrl = null) {
+        if (this.initialized) return;
+        
         try {
             licenseStorage.initialize();
+            serverClient.setServerUrl(serverUrl || CONFIG.SERVER_URL);
+            
             this.initialized = true;
-            console.log('License manager initialized');
+            console.log('[License] Manager initialized');
         } catch (error) {
-            console.error('Failed to initialize license manager:', error);
+            console.error('[License] Initialization failed:', error);
             throw error;
         }
     }
-
-    /**
-     * Ensure manager is initialized
-     */
+    
     ensureInitialized() {
         if (!this.initialized) {
             this.initialize();
         }
     }
-
-    /**
-     * Calculate days until expiry
-     * 
-     * @param {Date} expiryDate - Expiry date
-     * @returns {number} Days until expiry (negative if expired)
-     */
-    getDaysUntilExpiry(expiryDate) {
-        const now = new Date();
-        const diffMs = expiryDate.getTime() - now.getTime();
-        return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    
+    setServerUrl(url) {
+        CONFIG.SERVER_URL = url;
+        serverClient.setServerUrl(url);
     }
-
-    /**
-     * Check if currently in grace period
-     * 
-     * @param {Date} expiryDate - Expiry date
-     * @returns {boolean} True if in grace period
-     */
-    isInGracePeriod(expiryDate) {
-        const daysUntilExpiry = this.getDaysUntilExpiry(expiryDate);
-        return daysUntilExpiry < 0 && daysUntilExpiry >= -CONFIG.GRACE_PERIOD_DAYS;
-    }
-
-    /**
-     * Get active reminder level (if any)
-     * 
-     * @param {Date} expiryDate - Expiry date
-     * @returns {number|null} Days until expiry if within reminder period, null otherwise
-     */
-    getActiveReminder(expiryDate) {
-        const daysUntilExpiry = this.getDaysUntilExpiry(expiryDate);
-        
-        for (const reminderDays of CONFIG.REMINDER_DAYS) {
-            if (daysUntilExpiry <= reminderDays && daysUntilExpiry > 0) {
-                return daysUntilExpiry;
-            }
-        }
-        
-        return null;
-    }
-
-    /**
-     * Validate the current license
-     * 
-     * @returns {Object} Validation result
-     */
-    validateLicense() {
+    
+    // ========================================================================
+    // License Validation
+    // ========================================================================
+    
+    async validateLicense() {
         this.ensureInitialized();
-
+        
         const result = {
             status: LicenseStatus.NOT_ACTIVATED,
             message: '',
-            expiryDate: null,
-            daysUntilExpiry: null,
-            reminderDays: null,
             hardwareId: getHardwareId(),
-            gracePeriodRemaining: null
+            online: false,
+            license: null
         };
-
-        // Check for clock manipulation
-        const clockCheck = licenseStorage.checkClockManipulation(CONFIG.CLOCK_TOLERANCE_MS);
-        if (clockCheck.manipulated) {
-            result.status = LicenseStatus.CLOCK_MANIPULATED;
-            result.message = 'Waktu sistem terdeteksi tidak valid. Pastikan tanggal dan waktu komputer Anda benar.';
-            return result;
-        }
-
-        // Update last check time
-        licenseStorage.updateLastCheckTime();
-
-        // Check if license exists
+        
+        // Check if we have local license data
         if (!licenseStorage.hasLicense()) {
             result.status = LicenseStatus.NOT_ACTIVATED;
             result.message = 'Silakan masukkan license key untuk mengaktifkan aplikasi.';
             return result;
         }
-
-        // Load license data
-        const licenseData = licenseStorage.loadLicenseData();
-        if (!licenseData) {
+        
+        // Load local data
+        const localData = licenseStorage.loadLicenseData();
+        if (!localData) {
             result.status = LicenseStatus.INVALID_KEY;
-            result.message = 'Data lisensi rusak. Silakan masukkan ulang license key.';
+            result.message = 'Data lisensi rusak. Silakan aktivasi ulang.';
             licenseStorage.clearLicenseData();
             return result;
         }
-
-        this.licenseData = licenseData;
-
-        // Check hardware binding
-        const currentHardwareId = getHardwareId();
-        if (licenseData.hardwareId !== currentHardwareId) {
-            result.status = LicenseStatus.HARDWARE_MISMATCH;
-            result.message = 'Lisensi ini terdaftar untuk perangkat lain.';
-            result.hardwareId = currentHardwareId;
+        
+        this.licenseData = localData;
+        result.license = localData;
+        
+        // Validate with server
+        try {
+            const serverResult = await serverClient.validateLicense(result.hardwareId);
+            
+            if (serverResult.offline) {
+                return this.handleOfflineValidation(result);
+            }
+            
+            result.online = true;
+            licenseStorage.saveServerCache(serverResult);
+            
+            if (serverResult.revoked) {
+                result.status = LicenseStatus.REVOKED;
+                result.message = serverResult.reason || 'Lisensi telah dinonaktifkan.';
+                return result;
+            }
+            
+            if (serverResult.valid) {
+                result.status = LicenseStatus.VALID;
+                result.message = 'Lisensi aktif.';
+                return result;
+            }
+            
+            if (!serverResult.activated) {
+                result.status = LicenseStatus.NOT_ACTIVATED;
+                result.message = 'Lisensi tidak ditemukan. Silakan aktivasi ulang.';
+                licenseStorage.clearLicenseData();
+                return result;
+            }
+            
+            result.status = LicenseStatus.INVALID_KEY;
+            result.message = 'Lisensi tidak valid.';
+            return result;
+            
+        } catch (error) {
+            console.error('[License] Server validation error:', error);
+            return this.handleOfflineValidation(result);
+        }
+    }
+    
+    handleOfflineValidation(result) {
+        const offlineStatus = licenseStorage.checkOfflineStatus(CONFIG.OFFLINE_TOLERANCE_HOURS);
+        const cache = licenseStorage.loadServerCache();
+        
+        result.online = false;
+        result.offlineHours = offlineStatus.hoursOffline;
+        
+        if (!offlineStatus.hasCache) {
+            result.status = LicenseStatus.OFFLINE_EXPIRED;
+            result.message = 'Hubungkan ke server untuk verifikasi pertama.';
             return result;
         }
-
-        // Check expiry
-        const daysUntilExpiry = this.getDaysUntilExpiry(licenseData.expiryDate);
-        result.expiryDate = licenseData.expiryDate;
-        result.daysUntilExpiry = daysUntilExpiry;
-
-        if (daysUntilExpiry < 0) {
-            // Expired - check grace period
-            if (this.isInGracePeriod(licenseData.expiryDate)) {
-                const graceDaysRemaining = CONFIG.GRACE_PERIOD_DAYS + daysUntilExpiry;
-                result.status = LicenseStatus.GRACE_PERIOD;
-                result.gracePeriodRemaining = graceDaysRemaining;
-                result.message = `Lisensi sudah dalam masa tenggang: ${graceDaysRemaining} hari. Segera perpanjang lisensi.`;
-            } else {
-                result.status = LicenseStatus.EXPIRED;
-                result.message = 'Lisensi sudah expired dan masa tenggang telah berakhir.';
-            }
-        } else {
-            // Valid - check for reminders
-            result.status = LicenseStatus.VALID;
-            result.reminderDays = this.getActiveReminder(licenseData.expiryDate);
-            
-            if (result.reminderDays !== null) {
-                result.message = `Lisensi akan expired dalam ${result.reminderDays} hari.`;
-            } else {
-                result.message = 'Lisensi aktif.';
-            }
+        
+        if (cache?.revoked) {
+            result.status = LicenseStatus.REVOKED;
+            result.message = cache.revokedReason || 'Lisensi telah dinonaktifkan.';
+            return result;
         }
-
-        this.currentStatus = result.status;
+        
+        if (offlineStatus.expired) {
+            result.status = LicenseStatus.OFFLINE_EXPIRED;
+            result.message = offlineStatus.message;
+            return result;
+        }
+        
+        result.status = LicenseStatus.OFFLINE_VALID;
+        result.message = `Mode offline. ${offlineStatus.message}`;
         return result;
     }
-
-    /**
-     * Activate a new license
-     * 
-     * @param {string} licenseKey - License key to activate
-     * @returns {Object} Activation result
-     */
-    activateLicense(licenseKey) {
+    
+    // ========================================================================
+    // License Activation (Post-binding)
+    // ========================================================================
+    
+    async activateLicense(licenseKey) {
         this.ensureInitialized();
-
+        
         const result = {
             success: false,
-            message: '',
-            expiryDate: null
+            message: ''
         };
-
-        // Validate the license key format and extract expiry + hardware ID
-        const validation = validateLicenseKey(licenseKey);
         
-        if (!validation.valid) {
-            result.message = validation.error || 'License key tidak valid.';
+        // Basic format validation
+        const keyValidation = validateLicenseKey(licenseKey);
+        if (!keyValidation.valid) {
+            result.message = keyValidation.error;
             return result;
         }
-
-        // Check if not already expired
-        const daysUntilExpiry = this.getDaysUntilExpiry(validation.expiryDate);
-        if (daysUntilExpiry < -CONFIG.GRACE_PERIOD_DAYS) {
-            result.message = 'License key ini sudah expired.';
-            return result;
-        }
-
-        // Get current hardware ID
-        const currentHardwareId = getHardwareId();
         
-        // PRE-BINDING CHECK: Verify embedded Hardware ID matches current device
-        const embeddedHwId = validation.hardwareId; // First 8 chars of HW ID from key
-        const currentHwIdPrefix = currentHardwareId.substring(0, 8).toUpperCase();
+        const currentHwId = getHardwareId();
         
-        if (embeddedHwId !== currentHwIdPrefix) {
-            result.message = 'License key ini tidak terdaftar untuk perangkat ini.\n\nPastikan key yang dimasukkan sesuai dengan Hardware ID perangkat Anda.';
-            console.log('Hardware mismatch:', {
-                embedded: embeddedHwId,
-                current: currentHwIdPrefix
-            });
-            return result;
-        }
-
-        // Save license data
+        // Server activation (this is where binding happens)
         try {
+            const serverResult = await serverClient.activateLicense(
+                licenseKey,
+                currentHwId,
+                this.getDeviceName()
+            );
+            
+            if (!serverResult.success) {
+                result.message = serverResult.message || 'Aktivasi gagal.';
+                return result;
+            }
+            
+            // Save locally
             licenseStorage.saveLicenseData({
                 licenseKey: licenseKey.toUpperCase(),
-                expiryDate: validation.expiryDate,
-                hardwareId: currentHardwareId
+                hardwareId: currentHwId,
+                productCode: keyValidation.productCode
             });
-
+            
+            licenseStorage.saveServerCache({
+                valid: true,
+                revoked: false,
+                serverTime: new Date().toISOString(),
+                offlineToleranceHours: CONFIG.OFFLINE_TOLERANCE_HOURS
+            });
+            
             result.success = true;
             result.message = 'Lisensi berhasil diaktifkan!';
-            result.expiryDate = validation.expiryDate;
-
-            console.log('License activated:', {
-                expiry: validation.expiryDate.toISOString(),
-                hardwareId: currentHardwareId.substring(0, 8) + '...'
-            });
+            
+            console.log('[License] Activated:', currentHwId.substring(0, 8) + '...');
+            return result;
+            
         } catch (error) {
-            console.error('Failed to save license:', error);
-            result.message = 'Gagal menyimpan data lisensi. Silakan coba lagi.';
+            console.error('[License] Activation error:', error);
+            result.message = 'Tidak dapat terhubung ke server lisensi.';
+            return result;
         }
-
-        return result;
     }
-
-    /**
-     * Deactivate (remove) the current license
-     * 
-     * @returns {Object} Deactivation result
-     */
+    
     deactivateLicense() {
         this.ensureInitialized();
-
+        
         try {
             licenseStorage.clearLicenseData();
             this.licenseData = null;
             this.currentStatus = LicenseStatus.NOT_ACTIVATED;
-
-            return {
-                success: true,
-                message: 'Lisensi berhasil dihapus.'
-            };
+            
+            return { success: true, message: 'Lisensi berhasil dihapus dari perangkat ini.' };
         } catch (error) {
-            console.error('Failed to deactivate license:', error);
-            return {
-                success: false,
-                message: 'Gagal menghapus lisensi.'
-            };
+            console.error('[License] Deactivation error:', error);
+            return { success: false, message: 'Gagal menghapus lisensi.' };
         }
     }
-
-    /**
-     * Get license information (for display)
-     * 
-     * @returns {Object} License info
-     */
-    getLicenseInfo() {
+    
+    // ========================================================================
+    // Status Helpers
+    // ========================================================================
+    
+    async isLicensed() {
+        const validation = await this.validateLicense();
+        
+        return [
+            LicenseStatus.VALID,
+            LicenseStatus.OFFLINE_VALID
+        ].includes(validation.status);
+    }
+    
+    async getLicenseInfo() {
         this.ensureInitialized();
-
-        const validation = this.validateLicense();
-        const hardwareDetails = getHardwareDetails();
-
+        
+        // Always get hardware ID first - this should never fail
+        let hardwareId = 'UNKNOWN';
+        let hardwareDetails = {};
+        
+        try {
+            hardwareId = getHardwareId();
+            hardwareDetails = getHardwareDetails();
+        } catch (error) {
+            console.error('[License] Failed to get hardware ID:', error);
+        }
+        
+        // Try validation, but don't let it fail the entire call
+        let validation = {
+            status: LicenseStatus.NOT_ACTIVATED,
+            message: '',
+            hardwareId: hardwareId
+        };
+        
+        try {
+            validation = await this.validateLicense();
+        } catch (error) {
+            console.error('[License] Validation error in getLicenseInfo:', error);
+            validation.message = 'Tidak dapat memvalidasi lisensi';
+        }
+        
         return {
             ...validation,
+            hardwareId: hardwareId,
             hardwareDetails,
             storagePath: licenseStorage.getStoragePath()
         };
     }
-
-    /**
-     * Check if app should run (is licensed)
-     * 
-     * @returns {boolean} True if app is allowed to run
-     */
-    isLicensed() {
-        const validation = this.validateLicense();
-        return [
-            LicenseStatus.VALID,
-            LicenseStatus.GRACE_PERIOD
-        ].includes(validation.status);
+    
+    getDeviceName() {
+        const os = require('os');
+        return os.hostname();
     }
-
-    /**
-     * Check if reminder should be shown
-     * 
-     * @returns {Object|null} Reminder info or null
-     */
-    getReminder() {
-        const validation = this.validateLicense();
-
-        if (validation.status === LicenseStatus.GRACE_PERIOD) {
-            return {
-                type: 'grace_period',
-                message: validation.message,
-                daysRemaining: validation.gracePeriodRemaining,
-                severity: 'critical'
-            };
+    
+    async getWarning() {
+        try {
+            const validation = await this.validateLicense();
+            
+            if (validation.status === LicenseStatus.OFFLINE_VALID) {
+                return {
+                    type: 'offline',
+                    message: validation.message,
+                    severity: 'warning'
+                };
+            }
+        } catch (error) {
+            console.error('[License] getWarning error:', error);
         }
-
-        if (validation.reminderDays !== null) {
-            let severity = 'info';
-            if (validation.reminderDays <= 7) severity = 'warning';
-            if (validation.reminderDays <= 3) severity = 'critical';
-
-            return {
-                type: 'expiry_reminder',
-                message: validation.message,
-                daysRemaining: validation.reminderDays,
-                severity
-            };
-        }
-
+        
         return null;
     }
 }
 
-// Export singleton instance and classes
+// ============================================================================
+// Export Singleton
+// ============================================================================
+
 const licenseManager = new LicenseManager();
 
 module.exports = {
     licenseManager,
     LicenseManager,
     LicenseStatus,
-    CONFIG: {
-        GRACE_PERIOD_DAYS: CONFIG.GRACE_PERIOD_DAYS,
-        REMINDER_DAYS: CONFIG.REMINDER_DAYS
-    }
+    CONFIG
 };

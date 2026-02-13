@@ -1,9 +1,46 @@
 // Electron
 const { app, Menu, ipcMain, dialog, BrowserWindow } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 // License system
 const { licenseManager, LicenseStatus } = require('./src/license');
+
+// ============================================================================
+// Configuration
+// ============================================================================
+
+// License server URL - priority: Env Var -> Config File -> Default
+function getServerUrl() {
+    // 1. Environment Variable
+    if (process.env.LICENSE_SERVER_URL) {
+        return process.env.LICENSE_SERVER_URL;
+    }
+
+    // 2. Config File (server-config.json)
+    // In production, look next to the executable. In dev, look in project root.
+    const configPath = app.isPackaged 
+        ? path.join(path.dirname(process.execPath), 'server-config.json')
+        : path.join(__dirname, 'server-config.json');
+
+    try {
+        if (fs.existsSync(configPath)) {
+            const configData = fs.readFileSync(configPath, 'utf8');
+            const config = JSON.parse(configData);
+            if (config.serverUrl) {
+                console.log('[App] Loaded server URL from config:', config.serverUrl);
+                return config.serverUrl;
+            }
+        }
+    } catch (error) {
+        console.error('[App] Error reading server-config.json:', error);
+    }
+
+    // 3. Default (Localhost)
+    return 'http://127.0.0.1:3000';
+}
+
+const LICENSE_SERVER_URL = getServerUrl();
 
 let mainWindow;
 let licenseWindow;
@@ -85,11 +122,11 @@ function createMainWindow() {
 	// Print function (if enabled)
 	require('./src/print');
 
-	// Check for license reminders after window loads
-	mainWindow.webContents.on('did-finish-load', () => {
-		const reminder = licenseManager.getReminder();
-		if (reminder) {
-			mainWindow.webContents.send('license-reminder', reminder);
+	// Check for license warnings after window loads
+	mainWindow.webContents.on('did-finish-load', async () => {
+		const warning = await licenseManager.getWarning();
+		if (warning) {
+			mainWindow.webContents.send('license-warning', warning);
 		}
 	});
 
@@ -103,35 +140,60 @@ function createMainWindow() {
  */
 async function initializeApp() {
 	try {
-		// Initialize license manager
-		licenseManager.initialize();
+		// Initialize license manager with server URL
+		licenseManager.initialize(LICENSE_SERVER_URL);
 
-		// Validate license
-		const validation = licenseManager.validateLicense();
-		console.log('License validation:', validation.status, validation.message);
+		// Validate license (await async call)
+		const validation = await licenseManager.validateLicense();
+		console.log('[App] License status:', validation.status);
 
-		if (licenseManager.isLicensed()) {
-			// License is valid, create main window
-			createMainWindow();
+		// Handle based on status
+		switch (validation.status) {
+			case LicenseStatus.VALID:
+			case LicenseStatus.OFFLINE_VALID:
+				// License valid - start app
+				createMainWindow();
+				
+				// Show offline warning if applicable
+				if (validation.status === LicenseStatus.OFFLINE_VALID) {
+					setTimeout(() => {
+						if (mainWindow) {
+							dialog.showMessageBox(mainWindow, {
+								type: 'warning',
+								title: 'Mode Offline',
+								message: 'Aplikasi berjalan dalam mode offline',
+								detail: validation.message,
+								buttons: ['OK']
+							});
+						}
+					}, 1000);
+				}
+				break;
 
-			// Show reminder if applicable
-			if (validation.status === LicenseStatus.GRACE_PERIOD) {
-				dialog.showMessageBox(mainWindow, {
-					type: 'warning',
-					title: 'Lisensi Expired',
-					message: validation.message,
-					buttons: ['OK']
-				});
-			}
-		} else {
-			// License is not valid, show license dialog
-			if (validation.status === LicenseStatus.CLOCK_MANIPULATED) {
-				dialog.showErrorBox('Error', validation.message);
+			case LicenseStatus.REVOKED:
+				// License revoked - show message and exit
+				dialog.showErrorBox(
+					'Lisensi Dinonaktifkan',
+					validation.message || 'Lisensi aplikasi ini telah dinonaktifkan.'
+				);
 				app.quit();
-				return;
-			}
+				break;
 
-			createLicenseWindow();
+			case LicenseStatus.OFFLINE_EXPIRED:
+				// Offline too long - require server connection
+				dialog.showErrorBox(
+					'Verifikasi Diperlukan',
+					validation.message || 'Hubungkan ke server untuk memverifikasi lisensi.'
+				);
+				app.quit();
+				break;
+
+			case LicenseStatus.NOT_ACTIVATED:
+			case LicenseStatus.INVALID_KEY:
+			default:
+				// Need activation
+				createLicenseWindow();
+				break;
 		}
 	} catch (error) {
 		console.error('Failed to initialize app:', error);

@@ -16,8 +16,11 @@ const os = require('os');
  * Configuration for hardware ID generation
  */
 const CONFIG = {
+    // Salt for additional security (change this for your deployment)
     SALT: 'eyesee-license-v1',
+    // Hash algorithm
     ALGORITHM: 'sha256',
+    // Output length (characters)
     OUTPUT_LENGTH: 32
 };
 

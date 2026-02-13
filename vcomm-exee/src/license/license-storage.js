@@ -1,263 +1,269 @@
 /**
  * License Storage Module
- * Handles secure, encrypted storage of license data using electron-store.
  * 
- * Features:
- * - Encrypted storage with hardware-based key
- * - Clock manipulation detection
- * - Automatic cleanup of corrupted data
+ * Handles secure, encrypted storage of license data using electron-store.
+ * Stores both license activation data and server validation cache.
  * 
  * @module license/license-storage
  */
 
-// electron-store v8+ compatibility - handle both ESM and CJS exports
 const ElectronStore = require('electron-store');
 const Store = ElectronStore.default || ElectronStore;
 
 const { getHardwareId } = require('./hardware-id');
 const { encrypt, decrypt } = require('./license-crypto');
 
-/**
- * Configuration
- */
+// ============================================================================
+// Configuration
+// ============================================================================
+
 const CONFIG = {
     STORE_NAME: 'vcomm-license',
     PROJECT_NAME: 'VComm Application',
-    ENCRYPTION_KEY_SUFFIX: '-storage-key',
+    ENCRYPTION_KEY_SUFFIX: '-storage-key-v2',
     
-    // Storage keys
     KEYS: {
         LICENSE_DATA: 'licenseData',
-        LAST_CHECK_TIME: 'lastCheckTime',
-        ACTIVATION_DATE: 'activationDate',
+        SERVER_CACHE: 'serverCache',
+        LAST_SERVER_CHECK: 'lastServerCheck',
         BOUND_HARDWARE_ID: 'boundHardwareId'
     }
 };
 
-/**
- * License Storage class
- * Manages encrypted license data persistence
- */
+// ============================================================================
+// License Storage Class
+// ============================================================================
+
 class LicenseStorage {
     constructor() {
         this.store = null;
         this.encryptionPassword = null;
         this.initialized = false;
     }
-
+    
     /**
-     * Initialize the storage
-     * Must be called before any other operations
+     * Initialize the storage - must be called before any operations
      */
     initialize() {
-        if (this.initialized) {
-            return;
-        }
-
+        if (this.initialized) return;
+        
         try {
-            // Generate encryption password from hardware ID
             const hardwareId = getHardwareId();
             this.encryptionPassword = hardwareId + CONFIG.ENCRYPTION_KEY_SUFFIX;
-
-            // Initialize electron-store
-            // projectName is required for electron-store v11+ when running outside Electron
+            
             this.store = new Store({
                 name: CONFIG.STORE_NAME,
                 projectName: CONFIG.PROJECT_NAME,
                 encryptionKey: this.encryptionPassword,
                 clearInvalidConfig: true
             });
-
+            
             this.initialized = true;
-            console.log('License storage initialized');
+            console.log('[Storage] Initialized');
         } catch (error) {
-            console.error('Failed to initialize license storage:', error);
+            console.error('[Storage] Initialization failed:', error);
             throw error;
         }
     }
-
-    /**
-     * Ensure storage is initialized
-     */
+    
     ensureInitialized() {
         if (!this.initialized) {
             this.initialize();
         }
     }
-
+    
+    // ========================================================================
+    // License Data Operations
+    // ========================================================================
+    
     /**
-     * Save license data
+     * Save license activation data
      * 
-     * @param {Object} licenseData - License information to save
-     * @param {string} licenseData.licenseKey - The license key
-     * @param {Date} licenseData.expiryDate - Expiration date
-     * @param {string} licenseData.hardwareId - Bound hardware ID
+     * @param {Object} data - License data to save
+     * @param {string} data.licenseKey - The license key
+     * @param {string} data.hardwareId - Bound hardware ID
+     * @param {string} data.productCode - Product code from key
      */
-    saveLicenseData(licenseData) {
+    saveLicenseData(data) {
         this.ensureInitialized();
-
-        const dataToStore = {
-            licenseKey: licenseData.licenseKey,
-            expiryDate: licenseData.expiryDate.toISOString(),
-            hardwareId: licenseData.hardwareId,
+        
+        const record = {
+            licenseKey: data.licenseKey,
+            hardwareId: data.hardwareId,
+            productCode: data.productCode || null,
             activatedAt: new Date().toISOString()
         };
-
-        // Encrypt the license data for additional security
-        const encrypted = encrypt(JSON.stringify(dataToStore), this.encryptionPassword);
+        
+        const encrypted = encrypt(JSON.stringify(record), this.encryptionPassword);
         
         this.store.set(CONFIG.KEYS.LICENSE_DATA, encrypted);
-        this.store.set(CONFIG.KEYS.BOUND_HARDWARE_ID, licenseData.hardwareId);
-        this.store.set(CONFIG.KEYS.ACTIVATION_DATE, dataToStore.activatedAt);
+        this.store.set(CONFIG.KEYS.BOUND_HARDWARE_ID, data.hardwareId);
         
-        // Update last check time
-        this.updateLastCheckTime();
-        
-        console.log('License data saved');
+        console.log('[Storage] License data saved');
     }
-
+    
     /**
-     * Load license data
+     * Load license activation data
      * 
-     * @returns {Object|null} License data or null if not found/invalid
+     * @returns {Object|null} License data or null
      */
     loadLicenseData() {
         this.ensureInitialized();
-
+        
         try {
             const encrypted = this.store.get(CONFIG.KEYS.LICENSE_DATA);
             
-            if (!encrypted) {
-                return null;
-            }
-
-            const decrypted = decrypt(encrypted, this.encryptionPassword);
+            if (!encrypted) return null;
             
+            const decrypted = decrypt(encrypted, this.encryptionPassword);
             if (!decrypted) {
-                console.warn('Failed to decrypt license data');
+                console.warn('[Storage] Failed to decrypt license data');
                 return null;
             }
-
+            
             const data = JSON.parse(decrypted);
             
-            // Convert date strings back to Date objects
             return {
                 licenseKey: data.licenseKey,
-                expiryDate: new Date(data.expiryDate),
                 hardwareId: data.hardwareId,
+                productCode: data.productCode,
                 activatedAt: new Date(data.activatedAt)
             };
         } catch (error) {
-            console.error('Failed to load license data:', error);
+            console.error('[Storage] Load license failed:', error);
             return null;
         }
     }
-
+    
     /**
-     * Check if license exists
-     * 
-     * @returns {boolean} True if license data exists
+     * Check if license data exists
      */
     hasLicense() {
         this.ensureInitialized();
         return this.store.has(CONFIG.KEYS.LICENSE_DATA);
     }
-
+    
     /**
-     * Get the bound hardware ID
-     * 
-     * @returns {string|null} Bound hardware ID or null
+     * Get bound hardware ID
      */
     getBoundHardwareId() {
         this.ensureInitialized();
         return this.store.get(CONFIG.KEYS.BOUND_HARDWARE_ID, null);
     }
-
+    
+    // ========================================================================
+    // Server Validation Cache
+    // ========================================================================
+    
     /**
-     * Update last check timestamp
-     * Used for clock manipulation detection
-     */
-    updateLastCheckTime() {
-        this.ensureInitialized();
-        this.store.set(CONFIG.KEYS.LAST_CHECK_TIME, Date.now());
-    }
-
-    /**
-     * Get last check timestamp
+     * Save server validation result for offline fallback
      * 
-     * @returns {number|null} Last check timestamp or null
+     * @param {Object} serverResponse - Validation response from server
      */
-    getLastCheckTime() {
+    saveServerCache(serverResponse) {
         this.ensureInitialized();
-        return this.store.get(CONFIG.KEYS.LAST_CHECK_TIME, null);
-    }
-
-    /**
-     * Detect clock manipulation
-     * Returns true if the current time is suspiciously before the last check time
-     * 
-     * @param {number} toleranceMs - Tolerance in milliseconds (default: 1 hour)
-     * @returns {Object} Clock check result
-     */
-    checkClockManipulation(toleranceMs = 3600000) {
-        this.ensureInitialized();
-
-        const lastCheck = this.getLastCheckTime();
-        const now = Date.now();
-
-        const result = {
-            manipulated: false,
-            lastCheckTime: lastCheck ? new Date(lastCheck) : null,
-            currentTime: new Date(now),
-            timeDifference: lastCheck ? now - lastCheck : null
+        
+        const cache = {
+            valid: serverResponse.valid,
+            revoked: serverResponse.revoked || false,
+            revokedReason: serverResponse.revokedReason || null,
+            serverTime: serverResponse.serverTime || new Date().toISOString(),
+            cachedAt: new Date().toISOString(),
+            offlineToleranceHours: serverResponse.offlineToleranceHours || 24
         };
-
-        if (lastCheck === null) {
-            // First run, no previous check
-            return result;
-        }
-
-        // If current time is more than tolerance behind last check, suspicious
-        if (now < lastCheck - toleranceMs) {
-            result.manipulated = true;
-            console.warn('Clock manipulation detected!', {
-                lastCheck: new Date(lastCheck).toISOString(),
-                now: new Date(now).toISOString(),
-                difference: (lastCheck - now) / 1000 / 60, // minutes
-            });
-        }
-
-        return result;
+        
+        this.store.set(CONFIG.KEYS.SERVER_CACHE, cache);
+        this.store.set(CONFIG.KEYS.LAST_SERVER_CHECK, Date.now());
+        
+        console.log('[Storage] Server cache updated');
     }
-
+    
     /**
-     * Clear all license data
+     * Load cached server validation
+     * 
+     * @returns {Object|null} Cached data or null
+     */
+    loadServerCache() {
+        this.ensureInitialized();
+        return this.store.get(CONFIG.KEYS.SERVER_CACHE, null);
+    }
+    
+    /**
+     * Get timestamp of last server check
+     * 
+     * @returns {number|null} Unix timestamp or null
+     */
+    getLastServerCheck() {
+        this.ensureInitialized();
+        return this.store.get(CONFIG.KEYS.LAST_SERVER_CHECK, null);
+    }
+    
+    /**
+     * Check if offline tolerance has been exceeded
+     * 
+     * @param {number} toleranceHours - Maximum hours allowed offline
+     * @returns {Object} Offline status
+     */
+    checkOfflineStatus(toleranceHours = 24) {
+        this.ensureInitialized();
+        
+        const lastCheck = this.getLastServerCheck();
+        const cache = this.loadServerCache();
+        
+        // Use tolerance from cache if available
+        const tolerance = cache?.offlineToleranceHours || toleranceHours;
+        const toleranceMs = tolerance * 60 * 60 * 1000;
+        
+        if (!lastCheck) {
+            return {
+                hasCache: false,
+                expired: true,
+                message: 'Belum pernah terverifikasi dengan server'
+            };
+        }
+        
+        const elapsed = Date.now() - lastCheck;
+        const hoursOffline = Math.floor(elapsed / (60 * 60 * 1000));
+        
+        return {
+            hasCache: true,
+            lastCheck: new Date(lastCheck),
+            hoursOffline,
+            toleranceHours: tolerance,
+            expired: elapsed > toleranceMs,
+            message: elapsed > toleranceMs
+                ? `Offline lebih dari ${tolerance} jam. Hubungkan ke server.`
+                : `Terakhir diverifikasi ${hoursOffline} jam yang lalu`
+        };
+    }
+    
+    // ========================================================================
+    // Clear Operations
+    // ========================================================================
+    
+    /**
+     * Clear license data only (keeps server cache for security)
      */
     clearLicenseData() {
         this.ensureInitialized();
         
         this.store.delete(CONFIG.KEYS.LICENSE_DATA);
         this.store.delete(CONFIG.KEYS.BOUND_HARDWARE_ID);
-        this.store.delete(CONFIG.KEYS.ACTIVATION_DATE);
-        // Keep last check time for security
         
-        console.log('License data cleared');
+        console.log('[Storage] License data cleared');
     }
-
+    
     /**
-     * Clear all storage (including security data)
-     * Use with caution - mainly for testing
+     * Clear everything including caches
      */
     clearAll() {
         this.ensureInitialized();
         this.store.clear();
-        console.log('All license storage cleared');
+        console.log('[Storage] All storage cleared');
     }
-
+    
     /**
-     * Get storage file path (for debugging)
-     * 
-     * @returns {string} Path to the storage file
+     * Get storage file path for debugging
      */
     getStoragePath() {
         this.ensureInitialized();
@@ -265,7 +271,10 @@ class LicenseStorage {
     }
 }
 
-// Export singleton instance
+// ============================================================================
+// Export Singleton
+// ============================================================================
+
 const licenseStorage = new LicenseStorage();
 
 module.exports = {

@@ -1,0 +1,147 @@
+{
+  "generated_keys": [
+    {
+      "license_key": "Z1BM-011M-VC21-BPSQ",
+      "product_code": "BM01",
+      "generated_at": "2026-02-04T04:03:29.505Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    },
+    {
+      "license_key": "OYBM-01AB-OY7W-9IOI",
+      "product_code": "BM01",
+      "generated_at": "2026-02-04T04:03:29.532Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    },
+    {
+      "license_key": "50BM-01IW-2TAT-BT1E",
+      "product_code": "BM01",
+      "generated_at": "2026-02-04T04:03:29.559Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    },
+    {
+      "license_key": "X7BM-01AC-UBI6-3RD9",
+      "product_code": "BM01",
+      "generated_at": "2026-02-04T04:03:29.577Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    },
+    {
+      "license_key": "VPBM-01DK-D8QU-B3KK",
+      "product_code": "BM01",
+      "generated_at": "2026-02-04T04:03:29.594Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    },
+    {
+      "license_key": "GJBM-01EZ-V049-DNPM",
+      "product_code": "BM01",
+      "generated_at": "2026-02-04T04:53:35.540Z",
+      "generated_by": "admin",
+      "is_used": true,
+      "used_by_hardware_id": "C20EC14202D5FCFFCB2C2F2CD31F04E1",
+      "used_at": "2026-02-04T06:11:28.385Z"
+    },
+    {
+      "license_key": "LRBM-01S5-H4EA-B8MB",
+      "product_code": "BM01",
+      "generated_at": "2026-02-04T04:53:35.564Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    },
+    {
+      "license_key": "DTBM-01BJ-HRXS-B5KI",
+      "product_code": "BM01",
+      "generated_at": "2026-02-04T04:53:35.585Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    },
+    {
+      "license_key": "JEBM-01RL-JGA3-RWKV",
+      "product_code": "BM01",
+      "generated_at": "2026-02-09T04:53:35.215Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    },
+    {
+      "license_key": "55BL-013B-8VDV-BSBG",
+      "product_code": "BL01",
+      "generated_at": "2026-02-09T05:28:26.167Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    },
+    {
+      "license_key": "ZSVC-015M-YG2G-16J4",
+      "product_code": "VC01",
+      "generated_at": "2026-02-09T05:28:38.259Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    },
+    {
+      "license_key": "8YES-014F-2E4O-BIAR",
+      "product_code": "ES01",
+      "generated_at": "2026-02-09T05:28:42.412Z",
+      "generated_by": "admin",
+      "is_used": true,
+      "used_by_hardware_id": "C20EC14202D5FCFFCB2C2F2CD31F04E1",
+      "used_at": "2026-02-09T10:40:30.194Z"
+    },
+    {
+      "license_key": "F4ES-01JH-4FNY-WSNL",
+      "product_code": "ES01",
+      "generated_at": "2026-02-09T10:21:12.632Z",
+      "generated_by": "admin",
+      "is_used": false,
+      "used_by_hardware_id": null,
+      "used_at": null
+    }
+  ],
+  "licenses": [
+    {
+      "id": 1,
+      "license_key": "GJBM-01EZ-V049-DNPM",
+      "hardware_id": "C20EC14202D5FCFFCB2C2F2CD31F04E1",
+      "device_name": "freedom",
+      "product_code": "BM01",
+      "activated_at": "2026-02-04T06:11:28.406Z",
+      "last_check_at": "2026-02-12T05:12:03.395Z",
+      "is_revoked": false,
+      "revoked_at": null,
+      "revoked_reason": null
+    },
+    {
+      "id": 2,
+      "license_key": "8YES-014F-2E4O-BIAR",
+      "hardware_id": "C20EC14202D5FCFFCB2C2F2CD31F04E1",
+      "device_name": "freedom",
+      "product_code": "ES01",
+      "activated_at": "2026-02-09T10:40:30.209Z",
+      "last_check_at": "2026-02-09T10:40:30.209Z",
+      "is_revoked": false,
+      "revoked_at": null,
+      "revoked_reason": null
+    }
+  ]
+}

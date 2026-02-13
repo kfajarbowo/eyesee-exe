@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EyeSee License Server - Admin Panel</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1>🔐License Server</h1>
+                    <p class="subtitle">Admin Panel v1.0</p>
+                </div>
+                <!-- <div class="header-actions">
+                    <button class="btn-refresh" onclick="refreshAll()">
+                        <span class="icon">🔄</span> Refresh
+                    </button>
+                </div> -->
+            </div>
+        </div>
+    </header>
+
+    <div class="container main-content">
+        <!-- Stats Dashboard -->
+        <section class="stats-section">
+            <h2 class="section-title">Dashboard</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalKeys">-</div>
+                        <div class="stat-label">Total Keys Generated</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="activeLicenses">-</div>
+                        <div class="stat-label">Active Licenses</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏸️</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="revokedLicenses">-</div>
+                        <div class="stat-label">Revoked Licenses</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🔑</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="unusedKeys">-</div>
+                        <div class="stat-label">Unused Keys</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Generate Keys Section -->
+        <section class="generate-section">
+            <h2 class="section-title">Generate License Keys</h2>
+            <div class="card">
+                <form id="generateForm" class="generate-form">
+                    <div class="form-group">
+                        <label for="productCode">Product Code:</label>
+                        <select id="productCode" required>
+                            <option value="">-- Select Product --</option>
+                            <option value="BM01">BM01 - Battle Management System</option>
+                            <option value="BL01">BL01 - Battle Log Management System</option>
+                            <option value="VC01">VC01 - Voice Communication System</option>
+                            <option value="ES01">ES01 - EyeSee System</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity">Quantity:</label>
+                        <input type="number" id="quantity" min="1" max="100" value="1" required>
+                        <!-- <small>Maximum 100 keys per generation</small> -->
+                    </div>
+                    <button type="submit" class="btn-primary">Generate Keys</button>
+                </form>
+                <div id="generateResult" class="generate-result hidden"></div>
+            </div>
+        </section>
+
+        <!-- Generated Keys List -->
+        <section class="keys-section">
+            <h2 class="section-title">Generated Keys</h2>
+            <div class="card">
+                <div class="table-controls">
+                    <div class="filter-group">
+                        <label>Filter by Product:</label>
+                        <select id="filterProduct" onchange="filterGeneratedKeys()">
+                            <option value="">All Products</option>
+                            <option value="BM01">BM01 - BMS</option>
+                            <option value="BL01">BL01 - BLM</option>
+                            <option value="VC01">VC01 - VComm</option>
+                            <option value="ES01">ES01 - EyeSee</option>
+                        </select>
+                    </div>
+                    <div class="search-group">
+                        <input type="text" id="searchKey" placeholder="Search license key..." onkeyup="filterGeneratedKeys()">
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>License Key</th>
+                                <th>Product</th>
+                                <th>Status</th>
+                                <th>Generated At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="generatedKeysTable">
+                            <tr>
+                                <td colspan="5" class="loading">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Active Licenses -->
+        <section class="licenses-section">
+            <h2 class="section-title">Active Licenses</h2>
+            <div class="card">
+                <div class="table-controls">
+                    <div class="filter-group">
+                        <label>Filter by Product:</label>
+                        <select id="filterLicenseProduct" onchange="filterLicenses()">
+                            <option value="">All Products</option>
+                            <option value="BM01">BM01 - BMS</option>
+                            <option value="BL01">BL01 - BLM</option>
+                            <option value="VC01">VC01 - VComm</option>
+                            <option value="ES01">ES01 - EyeSee</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Status:</label>
+                        <select id="filterStatus" onchange="filterLicenses()">
+                            <option value="">All Status</option>
+                            <option value="active">Active Only</option>
+                            <option value="revoked">Revoked Only</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Hardware ID</th>
+                                <th>Device Name</th>
+                                <th>Product</th>
+                                <th>License Key</th>
+                                <th>Activated</th>
+                                <th>Last Check</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="licensesTable">
+                            <tr>
+                                <td colspan="8" class="loading">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal for showing generated keys -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Generated Keys</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="copyAllKeys()">Copy All</button>
+                <button class="btn-primary" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

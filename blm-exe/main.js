@@ -1,3 +1,10 @@
+/**
+ * BLM Webview Application - Main Process
+ * 
+ * Entry point for the Electron application.
+ * Handles license validation, window management, and IPC communication.
+ */
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const window = require('./src/window');
@@ -5,233 +12,302 @@ const menu = require('./src/menu');
 const print = require('./src/print');
 
 // License system
-const { licenseManager } = require('./src/license');
+const { licenseManager, LicenseStatus } = require('./src/license');
+
+// ============================================================================
+// Configuration
+// ============================================================================
+
+// License server URL - priority: Env Var -> Config File -> Default
+const fs = require('fs');
+
+function getServerUrl() {
+    // 1. Environment Variable
+    if (process.env.LICENSE_SERVER_URL) {
+        return process.env.LICENSE_SERVER_URL;
+    }
+
+    // 2. Config File (server-config.json)
+    // In production, look next to the executable. In dev, look in project root.
+    const configPath = app.isPackaged 
+        ? path.join(path.dirname(process.execPath), 'server-config.json')
+        : path.join(__dirname, 'server-config.json');
+
+    try {
+        if (fs.existsSync(configPath)) {
+            const configData = fs.readFileSync(configPath, 'utf8');
+            const config = JSON.parse(configData);
+            if (config.serverUrl) {
+                console.log('[App] Loaded server URL from config:', config.serverUrl);
+                return config.serverUrl;
+            }
+        }
+    } catch (error) {
+        console.error('[App] Error reading server-config.json:', error);
+    }
+
+    // 3. Default (Localhost)
+    return 'http://127.0.0.1:3000';
+}
+
+const LICENSE_SERVER_URL = getServerUrl();
+const WEB_APP_URL = 'http://192.168.204.102/';
+
+// ============================================================================
+// Window Management
+// ============================================================================
 
 let mainWindow;
 let licenseWindow;
 
-/**
- * Create license activation window
- */
-function createLicenseWindow() {
-	licenseWindow = new BrowserWindow({
-		width: 480,
-		height: 620,
-		resizable: false,
-		frame: true,
-		icon: path.join(__dirname, 'assets/icons/png/logo-bms.png'),
-		webPreferences: {
-			nodeIntegration: false,
-			contextIsolation: true,
-			preload: path.join(__dirname, 'preload.js')
-		}
-	});
+function createLicenseWindow(message = null) {
+    licenseWindow = new BrowserWindow({
+        width: 480,
+        height: 620,
+        resizable: false,
+        frame: true,
+        icon: path.join(__dirname, 'assets/icons/png/logo-bms.png'),
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
+        }
+    });
 
-	licenseWindow.setMenuBarVisibility(false);
-	licenseWindow.loadFile('license-dialog.html');
+    licenseWindow.setMenuBarVisibility(false);
+    licenseWindow.loadFile('license-dialog.html');
 
-	licenseWindow.on('closed', () => {
-		licenseWindow = null;
-		// If license window closed without activation, quit app
-		if (!licenseManager.isLicensed()) {
-			app.quit();
-		}
-	});
+    if (message) {
+        licenseWindow.webContents.on('did-finish-load', () => {
+            licenseWindow.webContents.send('license-message', message);
+        });
+    }
+
+    licenseWindow.on('closed', async () => {
+        licenseWindow = null;
+        
+        const isLicensed = await licenseManager.isLicensed();
+        if (!isLicensed) {
+            app.quit();
+        }
+    });
 }
 
-/**
- * Create main application window
- */
 function createMainWindow() {
-	mainWindow = window.createWindow();
+    mainWindow = window.createWindow();
+    mainWindow.setIcon(path.join(__dirname, 'assets/icons/png/logo-bms.png'));
+    mainWindow.loadURL(WEB_APP_URL);
 
-	// Set application icon
-	mainWindow.setIcon(path.join(__dirname, 'assets/icons/png/logo-bms.png'));
+    mainWindow.webContents.on('did-finish-load', () => {
+        console.log('Web application loaded successfully');
+    });
 
-	// Load the web application
-	const webAppURL = 'http://192.168.204.102/'; // URL dari webapp CodeIgniter
-	mainWindow.loadURL(webAppURL);
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+    });
 
-	// Handle webview ready event
-	mainWindow.webContents.on('did-finish-load', () => {
-		console.log('Web application loaded successfully');
-	});
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        require('electron').shell.openExternal(url);
+        return false;
+    });
 
-	// Handle window closed
-	mainWindow.on('closed', () => {
-		mainWindow = null;
-	});
-
-	// Handle external links
-	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-		require('electron').shell.openExternal(url);
-		return false;
-	});
-
-	// Setup IPC handlers
-	setupIPCHandlers();
+    setupIPCHandlers();
 }
 
-/**
- * Setup IPC handlers for app functionality
- */
 function setupIPCHandlers() {
-	// Navigation handlers
-	ipcMain.handle('navigate-back', () => {
-		const webview = mainWindow.webContents;
-		if (webview.goBack) {
-			webview.goBack();
-		}
-	});
+    ipcMain.handle('navigate-back', () => {
+        const webview = mainWindow.webContents;
+        if (webview.goBack) {
+            webview.goBack();
+        }
+    });
 
-	ipcMain.handle('navigate-forward', () => {
-		const webview = mainWindow.webContents;
-		if (webview.goForward) {
-			webview.goForward();
-		}
-	});
+    ipcMain.handle('navigate-forward', () => {
+        const webview = mainWindow.webContents;
+        if (webview.goForward) {
+            webview.goForward();
+        }
+    });
 
-	ipcMain.handle('navigate-home', () => {
-		const webview = mainWindow.webContents;
-		if (webview) {
-			webview.src = 'http://192.168.204.102/';
-		}
-	});
+    ipcMain.handle('navigate-home', () => {
+        const webview = mainWindow.webContents;
+        if (webview) {
+            webview.src = WEB_APP_URL;
+        }
+    });
 
-	ipcMain.handle('navigate-to-url', async (event, url) => {
-		const webview = mainWindow.webContents;
-		if (webview && url) {
-			webview.src = url;
-		}
-	});
+    ipcMain.handle('navigate-to-url', async (event, url) => {
+        const webview = mainWindow.webContents;
+        if (webview && url) {
+            webview.src = url;
+        }
+    });
 
-	ipcMain.handle('get-app-version', () => {
-		return app.getVersion();
-	});
+    ipcMain.handle('get-app-version', () => {
+        return app.getVersion();
+    });
 
-	ipcMain.handle('minimize-window', () => {
-		if (mainWindow) {
-			mainWindow.minimize();
-		}
-	});
+    ipcMain.handle('minimize-window', () => {
+        if (mainWindow) {
+            mainWindow.minimize();
+        }
+    });
 
-	ipcMain.handle('maximize-window', () => {
-		if (mainWindow) {
-			if (mainWindow.isMaximized()) {
-				mainWindow.unmaximize();
-			} else {
-				mainWindow.maximize();
-			}
-		}
-	});
+    ipcMain.handle('maximize-window', () => {
+        if (mainWindow) {
+            if (mainWindow.isMaximized()) {
+                mainWindow.unmaximize();
+            } else {
+                mainWindow.maximize();
+            }
+        }
+    });
 
-	ipcMain.handle('close-window', () => {
-		if (mainWindow) {
-			mainWindow.close();
-		}
-	});
+    ipcMain.handle('close-window', () => {
+        if (mainWindow) {
+            mainWindow.close();
+        }
+    });
 
-	ipcMain.handle('open-dev-tools', () => {
-		if (mainWindow) {
-			mainWindow.webContents.openDevTools();
-		}
-	});
+    ipcMain.handle('open-dev-tools', () => {
+        if (mainWindow) {
+            mainWindow.webContents.openDevTools();
+        }
+    });
 
-	ipcMain.handle('reload-app', () => {
-		const webview = mainWindow.webContents;
-		if (webview) {
-			webview.reload();
-		}
-	});
+    ipcMain.handle('reload-app', () => {
+        const webview = mainWindow.webContents;
+        if (webview) {
+            webview.reload();
+        }
+    });
 }
 
-/**
- * Initialize application with license check
- */
-function initializeApp() {
-	try {
-		// Initialize license manager
-		licenseManager.initialize();
+// ============================================================================
+// Application Initialization
+// ============================================================================
 
-		// Check license
-		const licenseStatus = licenseManager.validateLicense();
+async function initializeApp() {
+    try {
+        licenseManager.initialize(LICENSE_SERVER_URL);
 
-		if (licenseManager.isLicensed()) {
-			// License valid - create main window
-			menu.createMenu(mainWindow);
-			print.setupPrint();
-			createMainWindow();
-		} else {
-			// No valid license - show license dialog
-			createLicenseWindow();
-		}
-	} catch (error) {
-		console.error('Failed to initialize app:', error);
-		dialog.showErrorBox('Error', 'Gagal memulai aplikasi: ' + error.message);
-		app.quit();
-	}
+        const validation = await licenseManager.validateLicense();
+        
+        console.log('[App] License status:', validation.status);
+
+        switch (validation.status) {
+            case LicenseStatus.VALID:
+            case LicenseStatus.OFFLINE_VALID:
+                menu.createMenu(mainWindow);
+                print.setupPrint();
+                createMainWindow();
+                
+                if (validation.status === LicenseStatus.OFFLINE_VALID) {
+                    showOfflineWarning(validation.message);
+                }
+                break;
+
+            case LicenseStatus.REVOKED:
+                dialog.showErrorBox(
+                    'Lisensi Dinonaktifkan',
+                    validation.message || 'Lisensi aplikasi ini telah dinonaktifkan.'
+                );
+                app.quit();
+                break;
+
+            case LicenseStatus.OFFLINE_EXPIRED:
+                dialog.showErrorBox(
+                    'Verifikasi Diperlukan',
+                    validation.message || 'Hubungkan ke server untuk memverifikasi lisensi.'
+                );
+                app.quit();
+                break;
+
+            case LicenseStatus.NOT_ACTIVATED:
+            case LicenseStatus.INVALID_KEY:
+            case LicenseStatus.HARDWARE_MISMATCH:
+            default:
+                createLicenseWindow(validation.message);
+                break;
+        }
+
+    } catch (error) {
+        console.error('[App] Initialization failed:', error);
+        dialog.showErrorBox('Error', 'Gagal memulai aplikasi: ' + error.message);
+        app.quit();
+    }
 }
 
-// Handle app ready
+function showOfflineWarning(message) {
+    setTimeout(() => {
+        if (mainWindow) {
+            dialog.showMessageBox(mainWindow, {
+                type: 'warning',
+                title: 'Mode Offline',
+                message: 'Aplikasi berjalan dalam mode offline',
+                detail: message,
+                buttons: ['OK']
+            });
+        }
+    }, 1000);
+}
+
+// ============================================================================
+// Application Lifecycle
+// ============================================================================
+
 app.whenReady().then(() => {
-	initializeApp();
+    initializeApp();
 
-	app.on('activate', () => {
-		if (BrowserWindow.getAllWindows().length === 0) {
-			initializeApp();
-		}
-	});
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            initializeApp();
+        }
+    });
 });
 
 app.on('window-all-closed', () => {
-	if (process.platform !== 'darwin') {
-		app.quit();
-	}
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
 });
 
-// Handle app certificate errors for localhost
 app.on(
-	'certificate-error',
-	(event, webContents, url, error, certificate, callback) => {
-		// Ignore certificate errors for localhost development
-		if (url.includes('localhost') || url.includes('127.0.0.1')) {
-			event.preventDefault();
-			callback(true);
-		}
-	}
+    'certificate-error',
+    (event, webContents, url, error, certificate, callback) => {
+        if (url.includes('localhost') || url.includes('127.0.0.1')) {
+            event.preventDefault();
+            callback(true);
+        }
+    }
 );
 
-// ============================================================
+// ============================================================================
 // License IPC Handlers
-// ============================================================
+// ============================================================================
 
-// Activate license
 ipcMain.handle('activate-license', async (event, licenseKey) => {
-	const result = licenseManager.activateLicense(licenseKey);
-	return result;
+    const result = await licenseManager.activateLicense(licenseKey);
+    return result;
 });
 
-// Get license info
 ipcMain.handle('get-license-info', async () => {
-	return licenseManager.getLicenseInfo();
+    return await licenseManager.getLicenseInfo();
 });
 
-// Get license reminder
-ipcMain.handle('get-license-reminder', async () => {
-	return licenseManager.getReminder();
+ipcMain.handle('get-license-warning', async () => {
+    return await licenseManager.getWarning();
 });
 
-// License activated - close license window, open main window
 ipcMain.on('license-activated', () => {
-	if (licenseWindow) {
-		licenseWindow.close();
-	}
-	menu.createMenu(mainWindow);
-	print.setupPrint();
-	createMainWindow();
+    if (licenseWindow) {
+        licenseWindow.close();
+    }
+    menu.createMenu(mainWindow);
+    print.setupPrint();
+    createMainWindow();
 });
 
-// Deactivate license
 ipcMain.handle('deactivate-license', async () => {
-	return licenseManager.deactivateLicense();
+    return licenseManager.deactivateLicense();
 });

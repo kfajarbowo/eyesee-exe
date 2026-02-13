@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>License Admin Tool</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
+    <link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">🔐</div>
+            <h1>License Admin Tool</h1>
+            <p class="subtitle">Generate license keys for all products</p>
+        </div>
+
+        <!-- Form -->
+        <div class="form-section">
+            <!-- Product Selector -->
+            <div class="form-group">
+                <label for="product">Product</label>
+                <select id="product" class="select-input">
+                    <!-- Populated by JS -->
+                </select>
+            </div>
+
+            <!-- Hardware ID -->
+            <div class="form-group">
+                <label for="hardware-id">Hardware ID</label>
+                <input 
+                    type="text" 
+                    id="hardware-id" 
+                    class="text-input"
+                    placeholder="e.g., C20EC14202D5FCFF..."
+                    maxlength="32"
+                    spellcheck="false"
+                >
+                <span class="hint">Minimum 8 characters</span>
+            </div>
+
+            <!-- Expiry Date -->
+            <div class="form-group">
+                <label for="expiry-date">Expiry Date</label>
+                <input 
+                    type="date" 
+                    id="expiry-date" 
+                    class="text-input"
+                >
+            </div>
+
+            <!-- Generate Button -->
+            <button type="button" class="btn-generate" id="btn-generate">
+                Generate License Key
+            </button>
+        </div>
+
+        <!-- Result Section -->
+        <div class="result-section" id="result-section" style="display: none;">
+            <div class="result-header">
+                <span class="result-label">Generated License Key:</span>
+                <span class="product-badge" id="product-badge">EyeSee</span>
+            </div>
+            <div class="result-box">
+                <code class="license-key" id="license-key">XXXX-XXXX-XXXX-XXXX-XXXX-XXXX</code>
+                <button type="button" class="btn-copy" id="btn-copy" title="Copy to clipboard">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="result-details" id="result-details">
+                <span>Expiry: <strong id="detail-expiry">-</strong></span>
+                <span>Hardware: <strong id="detail-hardware">-</strong></span>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div class="error-message" id="error-message" style="display: none;"></div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const productSelect = document.getElementById('product');
+        const hardwareIdInput = document.getElementById('hardware-id');
+        const expiryDateInput = document.getElementById('expiry-date');
+        const btnGenerate = document.getElementById('btn-generate');
+        const resultSection = document.getElementById('result-section');
+        const licenseKeyDisplay = document.getElementById('license-key');
+        const productBadge = document.getElementById('product-badge');
+        const btnCopy = document.getElementById('btn-copy');
+        const errorMessage = document.getElementById('error-message');
+        const detailExpiry = document.getElementById('detail-expiry');
+        const detailHardware = document.getElementById('detail-hardware');
+
+        // Set default expiry date to 1 year from now
+        const defaultExpiry = new Date();
+        defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
+        expiryDateInput.value = defaultExpiry.toISOString().split('T')[0];
+
+        // Load products
+        async function loadProducts() {
+            const products = await window.api.getProducts();
+            productSelect.innerHTML = products.map(p => 
+                `<option value="${p.id}" data-color="${p.color}">${p.name} (${p.code})</option>`
+            ).join('');
+        }
+
+        // Format hardware ID as user types
+        hardwareIdInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            hideError();
+        });
+
+        // Generate license
+        btnGenerate.addEventListener('click', async () => {
+            const productId = productSelect.value;
+            const hardwareId = hardwareIdInput.value.trim();
+            const expiryDate = expiryDateInput.value;
+
+            if (!hardwareId || hardwareId.length < 8) {
+                showError('Hardware ID harus minimal 8 karakter');
+                return;
+            }
+
+            if (!expiryDate) {
+                showError('Pilih tanggal expiry');
+                return;
+            }
+
+            const result = await window.api.generateLicense({
+                productId,
+                hardwareId,
+                expiryDate
+            });
+
+            if (result.success) {
+                showResult(result);
+            } else {
+                showError(result.error);
+            }
+        });
+
+        // Copy to clipboard
+        btnCopy.addEventListener('click', async () => {
+            const key = licenseKeyDisplay.textContent;
+            await window.api.copyToClipboard(key);
+            
+            btnCopy.classList.add('copied');
+            setTimeout(() => btnCopy.classList.remove('copied'), 2000);
+        });
+
+        // Show result
+        function showResult(result) {
+            hideError();
+            licenseKeyDisplay.textContent = result.key;
+            productBadge.textContent = result.product;
+            detailExpiry.textContent = result.expiryDate;
+            detailHardware.textContent = result.hardwareId;
+            resultSection.style.display = 'block';
+        }
+
+        // Show error
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            resultSection.style.display = 'none';
+        }
+
+        // Hide error
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        // Enter key to generate
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                btnGenerate.click();
+            }
+        });
+
+        // Initialize
+        loadProducts();
+    </script>
+</body>
+</html>

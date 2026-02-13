@@ -13,11 +13,11 @@ contextBridge.exposeInMainWorld("electron", {
 	// Activate license with key
 	activateLicense: (licenseKey) => ipcRenderer.invoke('activate-license', licenseKey),
 	
-	// Get license information
+	// Get license information (includes hardware ID)
 	getLicenseInfo: () => ipcRenderer.invoke('get-license-info'),
 	
-	// Get license reminder (for expiry warnings)
-	getLicenseReminder: () => ipcRenderer.invoke('get-license-reminder'),
+	// Get license warning (for offline warnings)
+	getLicenseWarning: () => ipcRenderer.invoke('get-license-warning'),
 	
 	// Notify main process that license was activated
 	licenseActivated: () => ipcRenderer.send('license-activated'),
