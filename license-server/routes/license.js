@@ -103,6 +103,77 @@ router.get('/status', (req, res) => {
     });
 });
 
+// ============================================================================
+// Check License Key (Before Activation)
+// ============================================================================
+
+router.post('/check', (req, res) => {
+    try {
+        const { licenseKey } = req.body;
+        
+        if (!licenseKey) {
+            return res.status(400).json({ 
+                valid: false, 
+                error: 'License key diperlukan' 
+            });
+        }
+        
+        const normalizedKey = licenseKey.trim().toUpperCase();
+        
+        // Validate format
+        const keyValidation = validateKeyFormat(normalizedKey);
+        if (!keyValidation.valid) {
+            return res.json({
+                valid: false,
+                status: 'INVALID_FORMAT',
+                error: keyValidation.error,
+                message: 'Format license key tidak valid'
+            });
+        }
+        
+        // Check if key exists in generated keys
+        const generatedKey = generatedKeysRepo.findByKey(normalizedKey);
+        if (!generatedKey) {
+            return res.json({
+                valid: false,
+                status: 'NOT_FOUND',
+                error: 'License key tidak ditemukan',
+                message: 'License key tidak terdaftar di sistem'
+            });
+        }
+        
+        // Check if key is already used
+        if (generatedKey.is_used) {
+            return res.json({
+                valid: true,
+                status: 'ALREADY_ACTIVATED',
+                productCode: keyValidation.productCode,
+                message: 'License key sudah diaktifkan',
+                activatedBy: generatedKey.activated_by_hardware_id?.substring(0, 20) + '...',
+                usedAt: generatedKey.used_at
+            });
+        }
+        
+        // Key is valid and available
+        res.json({
+            valid: true,
+            status: 'AVAILABLE',
+            productCode: keyValidation.productCode,
+            productName: PRODUCTS[keyValidation.productCode]?.name || keyValidation.productCode,
+            message: 'License key valid dan dapat diaktifkan'
+        });
+        
+    } catch (error) {
+        console.error('[LICENSE] Check error:', error);
+        res.status(500).json({ valid: false, error: 'Internal server error' });
+    }
+});
+
+// ============================================================================
+// Activate License
+// ============================================================================
+
+
 router.post('/activate', (req, res) => {
     try {
         const { licenseKey, hardwareId, deviceName } = req.body;
@@ -290,6 +361,124 @@ router.post('/check-key', (req, res) => {
     } catch (error) {
         console.error('[LICENSE] Check key error:', error);
         res.status(500).json({ valid: false, error: 'Server error' });
+    }
+});
+
+// ============================================================================
+// TESTING ENDPOINTS (Development Only)
+// For developers to test without installing .exe
+// ============================================================================
+
+/**
+ * Reset key to unused state (for testing)
+ * POST /api/license/test/reset-key
+ */
+router.post('/test/reset-key', (req, res) => {
+    try {
+        const { licenseKey } = req.body;
+        
+        if (!licenseKey) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'License key required' 
+            });
+        }
+        
+        const normalizedKey = licenseKey.trim().toUpperCase();
+        const generatedKey = generatedKeysRepo.findByKey(normalizedKey);
+        
+        if (!generatedKey) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'License key not found' 
+            });
+        }
+        
+        // Reset key to unused
+        generatedKeysRepo.resetKeyToUnused(normalizedKey);
+        
+        // Also delete from active licenses if exists
+        const activeLicense = licenseRepo.getAll().find(l => l.license_key === normalizedKey);
+        if (activeLicense) {
+            licenseRepo.deleteByHardwareId(activeLicense.hardware_id);
+        }
+        
+        console.log(`[TEST] RESET KEY: ${normalizedKey}`);
+        
+        res.json({
+            success: true,
+            message: 'License key reset to unused state',
+            licenseKey: normalizedKey,
+            previousStatus: generatedKey.is_used ? 'USED' : 'UNUSED',
+            currentStatus: 'UNUSED'
+        });
+        
+    } catch (error) {
+        console.error('[TEST] Reset error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+/**
+ * Simulate activation (mark as used) without real hardware
+ * POST /api/license/test/mark-used
+ */
+router.post('/test/mark-used', (req, res) => {
+    try {
+        const { licenseKey } = req.body;
+        
+        if (!licenseKey) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'License key required' 
+            });
+        }
+        
+        const normalizedKey = licenseKey.trim().toUpperCase();
+        const generatedKey = generatedKeysRepo.findByKey(normalizedKey);
+        
+        if (!generatedKey) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'License key not found' 
+            });
+        }
+        
+        if (generatedKey.is_used) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'License key already used',
+                usedBy: generatedKey.activated_by_hardware_id
+            });
+        }
+        
+        // Mark as used with test hardware ID
+        const testHardwareId = 'TEST-' + crypto.randomBytes(16).toString('hex').toUpperCase();
+        generatedKeysRepo.markUsed(normalizedKey, testHardwareId);
+        
+        // Create fake license entry
+        const keyValidation = validateKeyFormat(normalizedKey);
+        licenseRepo.create({
+            license_key: normalizedKey,
+            hardware_id: testHardwareId,
+            device_name: 'TEST-DEVICE',
+            product_code: keyValidation.productCode
+        });
+        
+        console.log(`[TEST] MARKED AS USED: ${normalizedKey} -> ${testHardwareId}`);
+        
+        res.json({
+            success: true,
+            message: 'License key marked as used (test mode)',
+            licenseKey: normalizedKey,
+            testHardwareId: testHardwareId,
+            productCode: keyValidation.productCode,
+            status: 'USED'
+        });
+        
+    } catch (error) {
+        console.error('[TEST] Mark used error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });
 

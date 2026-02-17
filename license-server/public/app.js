@@ -355,18 +355,26 @@ async function reactivateLicense(hardwareId) {
 }
 
 async function deleteLicense(hardwareId) {
-    if (!confirm('⚠️ PERINGATAN: Ini akan menghapus lisensi secara PERMANEN dari database!\n\nYakin ingin menghapus?')) return;
-    
-    // Double confirmation
-    if (!confirm('Konfirmasi sekali lagi: Data tidak dapat dikembalikan!')) return;
+    // Find and confirm the specific license
+    const license = allLicenses.find(l => l.hardware_id === hardwareId);
+    if (!license) {
+        alert('License not found!');
+        return;
+    }
+
+    if (!confirm(`⚠️ HAPUS LICENSE?\n\nHardware ID: ${hardwareId.substring(0, 30)}...\nProduct: ${license.product_code}\nKey: ${license.license_key}\n\nYakin?`)) return;
+    if (!confirm('Konfirmasi: Data tidak dapat dikembalikan!')) return;
+
+    // Disable all delete buttons
+    document.querySelectorAll('.btn-secondary').forEach(btn => btn.disabled = true);
 
     try {
         await apiCall('DELETE', `/api/admin/licenses/${encodeURIComponent(hardwareId)}`);
-        
-        alert('✓ Lisensi berhasil dihapus permanen');
+        alert(`✓ License dihapus!\n${hardwareId.substring(0, 20)}...`);
         refreshAll();
     } catch (error) {
-        alert('Gagal menghapus lisensi: ' + error.message);
+        alert('Gagal menghapus: ' + error.message);
+        document.querySelectorAll('.btn-secondary').forEach(btn => btn.disabled = false);
     }
 }
 
