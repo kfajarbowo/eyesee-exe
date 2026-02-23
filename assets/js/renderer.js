@@ -182,15 +182,29 @@ const calculateLayoutSize = () => {
 	const webview = document.querySelector('webview');
 	if (!webview) return;
 
+	const controlsHeight = getControlsHeight();
+
+	if (controlsHeight === 0) {
+		// Tidak ada controls bar: biarkan CSS yang handle (position:fixed; inset:0)
+		// CSS responsive otomatis saat window di-resize, tanpa perlu JS
+		webview.style.width = '';
+		webview.style.height = '';
+		webview.style.left = '';
+		webview.style.top = '';
+		webview.style.right = '';
+		webview.style.bottom = '';
+		return;
+	}
+
+	// Ada controls bar: hitung tinggi tersisa
 	const windowWidth = window.innerWidth;
 	const windowHeight = window.innerHeight;
-	const controlsHeight = getControlsHeight();
-	const webviewHeight = windowHeight - controlsHeight;
-
 	webview.style.width = windowWidth + 'px';
-	webview.style.height = webviewHeight + 'px';
+	webview.style.height = (windowHeight - controlsHeight) + 'px';
 	webview.style.left = '0';
 	webview.style.top = controlsHeight + 'px';
+	webview.style.right = '';
+	webview.style.bottom = '';
 };
 
 // Debounce function for resize event
@@ -342,7 +356,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 	// Show loading screen only on first load
 	showLoadingScreen();
-	webview.style.display = 'none';
+	webview.style.visibility = 'hidden';
 
 	let firstLoad = true;
 
@@ -358,8 +372,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 			loadingIndicator.remove();
 		}
 
-		webview.style.display = '';
-		calculateLayoutSize(); // Pastikan ukuran benar saat webview ditampilkan
+		webview.style.visibility = 'visible';
+		calculateLayoutSize(); // hapus inline style jika tidak ada controls
 		firstLoad = false;
 
 		// Trigger performance analysis after page load
@@ -408,7 +422,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 					const normalizedUrl = normalizeUrl(url);
 					// Show light loading indicator instead of full screen
 					showLightLoading();
-					webview.style.display = 'none';
+					webview.style.visibility = 'hidden';
 					webview.src = normalizedUrl;
 				}
 			}
@@ -438,7 +452,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 			const home = webview.getAttribute('data-home');
 			if (home) {
 				showLightLoading();
-				webview.style.display = 'none';
+				webview.style.visibility = 'hidden';
 				webview.src = home;
 			}
 		});
