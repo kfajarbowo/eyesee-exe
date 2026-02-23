@@ -182,7 +182,6 @@ const calculateLayoutSize = () => {
 	const webview = document.querySelector('webview');
 	if (!webview) return;
 
-	// Gunakan window.innerWidth dan innerHeight untuk akurasi lebih baik
 	const windowWidth = window.innerWidth;
 	const windowHeight = window.innerHeight;
 	const controlsHeight = getControlsHeight();
@@ -190,6 +189,8 @@ const calculateLayoutSize = () => {
 
 	webview.style.width = windowWidth + 'px';
 	webview.style.height = webviewHeight + 'px';
+	webview.style.left = '0';
+	webview.style.top = controlsHeight + 'px';
 };
 
 // Debounce function for resize event
@@ -358,6 +359,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 		}
 
 		webview.style.display = '';
+		calculateLayoutSize(); // Pastikan ukuran benar saat webview ditampilkan
 		firstLoad = false;
 
 		// Trigger performance analysis after page load

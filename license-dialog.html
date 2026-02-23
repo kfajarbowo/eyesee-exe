@@ -63,6 +63,7 @@
         <!-- Footer -->
         <div class="license-footer">
             <p>Butuh bantuan? Hubungi administrator.</p>
+            <p id="debug-server-url" style="font-size:10px;color:#999;margin-top:4px;">Menghubungkan ke server...</p>
         </div>
     </div>
 
@@ -191,6 +192,14 @@
             // Initialize - get hardware ID
             async function initialize() {
                 try {
+                    // Show server URL for debugging
+                    if (window.electron.getServerUrl) {
+                        const url = await window.electron.getServerUrl();
+                        const debugEl = document.getElementById('debug-server-url');
+                        if (debugEl) debugEl.textContent = 'Server: ' + url;
+                        console.log('[Debug] Connecting to server:', url);
+                    }
+
                     const info = await window.electron.getLicenseInfo();
                     
                     if (info && info.hardwareId) {

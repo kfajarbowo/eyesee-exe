@@ -8,10 +8,50 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const { adminAuth } = require('../middleware/auth');
-const { licenseRepo, generatedKeysRepo } = require('../database/db');
+const { adminAuth, hashPassword } = require('../middleware/auth');
+const { licenseRepo, generatedKeysRepo, adminUsersRepo } = require('../database/db');
 
+// Login - public, no auth required
+router.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (!password) return res.status(400).json({ success: false, error: 'Password required' });
+
+    // Coba login via DB user (username harus valid string)
+    if (username && typeof username === 'string' && username.trim().length > 0) {
+        try {
+            if (adminUsersRepo.hasAnyUser()) {
+                const user = adminUsersRepo.findByUsername(username.trim());
+                if (!user) return res.status(401).json({ success: false, error: 'Username tidak ditemukan' });
+                if (user.password_hash !== hashPassword(password)) {
+                    return res.status(401).json({ success: false, error: 'Password salah' });
+                }
+                adminUsersRepo.updateLastLogin(username.trim());
+                return res.json({
+                    success: true,
+                    token: `${username.trim()}:${password}`,
+                    username: user.username,
+                    role: user.role,
+                    message: 'Login berhasil'
+                });
+            }
+        } catch (dbErr) {
+            // Tabel admin_users belum ada, fallback ke env var
+            console.warn('[LOGIN] DB check failed, falling back to env password:', dbErr.message);
+        }
+    }
+
+    // Fallback: password only (env var)
+    if (password !== adminPassword) {
+        return res.status(401).json({ success: false, error: 'Password salah' });
+    }
+    res.json({ success: true, token: adminPassword, username: username || 'admin', message: 'Login berhasil' });
+});
+
+// All routes below require auth
 router.use(adminAuth);
+
 
 // ============================================================================
 // Key Generation Configuration - ALL 4 PRODUCTS
@@ -288,22 +328,53 @@ router.post('/reactivate', (req, res) => {
     }
 });
 
+// DELETE by hardwareId + productCode (hapus 1 produk saja)
+router.delete('/licenses/:hardwareId/:productCode', (req, res) => {
+    try {
+        const { hardwareId, productCode } = req.params;
+
+        const license = licenseRepo.findByHardwareIdAndProduct(hardwareId, productCode);
+        if (!license) {
+            return res.status(404).json({
+                success: false,
+                error: `License ${productCode} untuk hardware ID ini tidak ditemukan`
+            });
+        }
+
+        // Reset generated key ke unused
+        const generatedKey = generatedKeysRepo.findByKey(license.license_key);
+        if (generatedKey) {
+            generatedKeysRepo.resetKeyToUnused(license.license_key);
+        }
+
+        licenseRepo.deleteByHardwareIdAndProduct(hardwareId, productCode);
+
+        console.log(`[ADMIN] DELETED: ${hardwareId.substring(0, 8)}... product=${productCode} (key reset)`);
+        res.json({
+            success: true,
+            message: `License ${productCode} dihapus, key dapat digunakan kembali`
+        });
+
+    } catch (error) {
+        console.error('[ADMIN] Delete by product error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+// DELETE semua license untuk 1 hardware ID
 router.delete('/licenses/:hardwareId', (req, res) => {
     try {
         const { hardwareId } = req.params;
-        // Check if license exists first
         const license = licenseRepo.findByHardwareId(hardwareId);
         if (!license) {
             return res.status(404).json({ success: false, error: 'License not found' });
         }
         
-        // Reset the generated key to unused so it can be reactivated
         const generatedKey = generatedKeysRepo.findByKey(license.license_key);
         if (generatedKey) {
             generatedKeysRepo.resetKeyToUnused(license.license_key);
         }
         
-        // Delete the license
         licenseRepo.deleteByHardwareId(hardwareId);
 
         console.log(`[ADMIN] DELETED: ${hardwareId.substring(0, 8)}... (key reset to unused)`);

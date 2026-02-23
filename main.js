@@ -37,10 +37,37 @@ function getServerUrl() {
     }
 
     // 3. Default (Localhost)
-    return 'http://127.0.0.1:3000';
+    return 'http://127.0.0.1:3001';
 }
 
 const LICENSE_SERVER_URL = getServerUrl();
+
+// Webview URL - baca dari server-config.json
+function getWebviewUrl() {
+    if (process.env.WEBVIEW_URL) return process.env.WEBVIEW_URL;
+
+    const configPath = app.isPackaged
+        ? path.join(path.dirname(process.execPath), 'server-config.json')
+        : path.join(__dirname, 'server-config.json');
+
+    try {
+        if (fs.existsSync(configPath)) {
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            if (config.webviewUrl) {
+                console.log('[App] Loaded webview URL from config:', config.webviewUrl);
+                return config.webviewUrl;
+            }
+        }
+    } catch (e) {
+        console.error('[App] Error reading webview URL from config:', e.message);
+    }
+
+    return null; // null = tampilkan halaman error
+}
+
+const WEBVIEW_URL = getWebviewUrl();
+console.log('[App] Webview URL:', WEBVIEW_URL || '(not configured)');
+
 
 let mainWindow;
 let licenseWindow;
@@ -72,6 +99,8 @@ function createLicenseWindow() {
 	
 	licenseWindow.once('ready-to-show', () => {
 		licenseWindow.show();
+		// DEBUG: Open DevTools to see errors
+		licenseWindow.webContents.openDevTools({ mode: 'detach' });
 	});
 
 	// Remove menu for license window
@@ -224,9 +253,23 @@ app.whenReady().then(() => {
 // License IPC Handlers
 // ============================================================
 
+// Expose server URL for debugging
+ipcMain.handle('get-server-url', async () => {
+	const client = require('./src/license/license-server-client');
+	return client.getConfig().serverUrl;
+});
+
+// Expose webview URL ke renderer (dibaca dari server-config.json)
+ipcMain.handle('get-webview-url', async () => {
+	return WEBVIEW_URL;
+});
+
+
 // Activate license
 ipcMain.handle('activate-license', async (event, licenseKey) => {
-	const result = licenseManager.activateLicense(licenseKey);
+	console.log('[DEBUG] activate-license called, server URL:', require('./src/license/license-server-client').getConfig().serverUrl);
+	const result = await licenseManager.activateLicense(licenseKey);
+	console.log('[DEBUG] activate-license result:', result);
 	return result;
 });
 

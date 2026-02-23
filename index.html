@@ -2,8 +2,6 @@
 	<head>
 		<link rel="stylesheet" href="assets/css/style.css" />
 		<link rel="stylesheet" href="assets/css/topbar.css" />
-
-		<!-- <link rel="stylesheet" href="assets/css/no-topbar.css"> -->
 		<script defer src="assets/js/renderer.js"></script>
 		<meta charset="UTF-8" />
 		<title>Eyesee</title>
@@ -14,73 +12,76 @@
 	</head>
 
 	<body>
-		<!-- URL Input Modal -->
-		<!-- <div id="url-modal" class="url-modal hidden">
-			<div class="url-modal-content">
-				<h3>Navigate to URL</h3>
-				<input
-					type="url"
-					id="url-input"
-					placeholder="Enter URL (e.g., https://example.com)"
-					autocomplete="url"
-				/>
-				<div class="url-modal-buttons">
-					<button type="button" class="cancel-btn" id="url-cancel">
-						Cancel
-					</button>
-					<button type="button" class="submit-btn" id="url-submit">Go</button>
-				</div>
-			</div>
-		</div> -->
-
-		<!-- Webview -->
-		<!-- <webview
-			autosize="on"
-			src="http://10.170.83.20:3000"
-			id="webview"
-			data-home="http://10.170.83.20:3000"
-			style="
-				position: fixed;
-				top: 0;
-				left: 0;
-				width: 100vw;
-				height: 100vh;
-				z-index: 10;
-				border: none;
-			"
-		></webview> -->
-
-		<!-- IP Spero -->
+		<!-- Webview: URL dibaca dari server-config.json via IPC -->
 		<webview
-			src="http://192.168.204.103:3000/"
 			id="webview"
-			data-home="http://192.168.204.103:3000/"
-		></webview>
-		<!-- IP Server -->
-		<!-- <webview
-			autosize="on"
-			src="http://192.168.204.103:3000"
-			id="webview"
-			data-home="http://192.168.204.103:3000"
 			style="
 				position: fixed;
 				top: 0;
 				left: 0;
 				width: 100vw;
 				height: 100vh;
-				z-index: 10;
 				border: none;
 			"
-		></webview> -->
+		></webview>
 
-		<!-- HTML -->
-		<!--
-    <h1>Hello world!</h1>
-    <p>
-      Lorem ipsum dolor sit amet consectetur adipisicing elit. Modi, voluptatum
-      sint ullam minima molestias nam id autem perferendis! Cumque veritatis
-      sunt dolor quidem cum? Natus dolore ipsum illum numquam molestiae?
-    </p>
-    -->
+		<!-- Error page jika URL tidak dikonfigurasi -->
+		<div id="error-screen" style="
+			display: none;
+			position: fixed;
+			inset: 0;
+			background: #f8f9fa;
+			font-family: -apple-system, sans-serif;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			color: #333;
+			text-align: center;
+			padding: 40px;
+		">
+			<div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+			<h2 style="margin-bottom: 8px;">URL Belum Dikonfigurasi</h2>
+			<p style="color: #666; max-width: 400px; margin-bottom: 24px;">
+				Tambahkan <code>webviewUrl</code> di file <code>server-config.json</code>
+				yang ada di folder yang sama dengan aplikasi ini.
+			</p>
+			<pre style="
+				background: #eee;
+				padding: 16px 24px;
+				border-radius: 8px;
+				font-size: 13px;
+				text-align: left;
+			">{
+  "serverUrl": "http://192.168.x.x:3001",
+  "webviewUrl": "http://192.168.x.x:3000"
+}</pre>
+		</div>
+
+		<script>
+			// Baca URL dari main process (server-config.json) — AMAN via IPC
+			window.electron.getWebviewUrl().then(url => {
+				const webview = document.getElementById('webview');
+				const errorScreen = document.getElementById('error-screen');
+
+				if (url) {
+					webview.src = url;
+					webview.setAttribute('data-home', url);
+					webview.style.display = 'block';
+					errorScreen.style.display = 'none';
+
+					// Trigger recalculate layout setelah src diset
+					// (renderer.js calculateLayoutSize() menggunakan window.innerWidth/Height)
+					requestAnimationFrame(() => {
+						window.dispatchEvent(new Event('resize'));
+					});
+				} else {
+					webview.style.display = 'none';
+					errorScreen.style.display = 'flex';
+				}
+			}).catch(err => {
+				console.error('Failed to get webview URL:', err);
+			});
+		</script>
 	</body>
 </html>

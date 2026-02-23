@@ -285,12 +285,44 @@ const licenseRepo = {
 
 
     /**
-     * Delete a license
+     * Delete a license by hardware ID only (hapus semua produk)
      */
     deleteByHardwareId(hardwareId) {
         const db = getDatabase();
         const stmt = db.prepare('DELETE FROM active_licenses WHERE hardware_id = ?');
         stmt.run(hardwareId);
+    },
+
+    /**
+     * Delete license untuk produk tertentu saja
+     */
+    deleteByHardwareIdAndProduct(hardwareId, productCode) {
+        const db = getDatabase();
+        const stmt = db.prepare('DELETE FROM active_licenses WHERE hardware_id = ? AND product_code = ?');
+        const result = stmt.run(hardwareId, productCode);
+        return result.changes > 0;
+    },
+
+    /**
+     * Find license by hardware ID + product code
+     */
+    findByHardwareIdAndProduct(hardwareId, productCode) {
+        const db = getDatabase();
+        const stmt = db.prepare('SELECT * FROM active_licenses WHERE hardware_id = ? AND product_code = ?');
+        const row = stmt.get(hardwareId, productCode);
+        if (!row) return null;
+        return {
+            id: row.id,
+            license_key: row.license_key,
+            hardware_id: row.hardware_id,
+            device_name: row.device_name,
+            product_code: row.product_code,
+            activated_at: row.activated_at,
+            last_check_at: row.last_check_at,
+            is_revoked: Boolean(row.is_revoked),
+            revoked_at: row.revoked_at,
+            revoked_reason: row.revoked_reason
+        };
     },
 
     /**
@@ -343,7 +375,83 @@ const licenseRepo = {
     }
 };
 
+// ============================================================================
+// Admin Users Repository
+// ============================================================================
+
+const adminUsersRepo = {
+    /**
+     * Create admin user
+     */
+    create(username, passwordHash, role = 'admin') {
+        const db = getDatabase();
+        const stmt = db.prepare(
+            'INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, ?)'
+        );
+        const result = stmt.run(username, passwordHash, role);
+        return this.findById(result.lastInsertRowid);
+    },
+
+    /**
+     * Find by username
+     */
+    findByUsername(username) {
+        const db = getDatabase();
+        return db.prepare('SELECT * FROM admin_users WHERE username = ? AND is_active = 1').get(username);
+    },
+
+    /**
+     * Find by ID
+     */
+    findById(id) {
+        const db = getDatabase();
+        return db.prepare('SELECT id, username, role, is_active, created_at, last_login_at FROM admin_users WHERE id = ?').get(id);
+    },
+
+    /**
+     * Get all users (no password hash)
+     */
+    getAll() {
+        const db = getDatabase();
+        return db.prepare('SELECT id, username, role, is_active, created_at, last_login_at FROM admin_users ORDER BY created_at DESC').all();
+    },
+
+    /**
+     * Update last login time
+     */
+    updateLastLogin(username) {
+        const db = getDatabase();
+        db.prepare("UPDATE admin_users SET last_login_at = datetime('now') WHERE username = ?").run(username);
+    },
+
+    /**
+     * Update password
+     */
+    updatePassword(username, newPasswordHash) {
+        const db = getDatabase();
+        db.prepare('UPDATE admin_users SET password_hash = ? WHERE username = ?').run(newPasswordHash, username);
+    },
+
+    /**
+     * Deactivate user
+     */
+    deactivate(username) {
+        const db = getDatabase();
+        db.prepare('UPDATE admin_users SET is_active = 0 WHERE username = ?').run(username);
+    },
+
+    /**
+     * Check if any admin user exists
+     */
+    hasAnyUser() {
+        const db = getDatabase();
+        const row = db.prepare('SELECT COUNT(*) as count FROM admin_users WHERE is_active = 1').get();
+        return row.count > 0;
+    }
+};
+
 module.exports = {
     generatedKeysRepo,
-    licenseRepo
+    licenseRepo,
+    adminUsersRepo
 };

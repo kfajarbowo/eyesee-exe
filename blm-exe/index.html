@@ -60,12 +60,23 @@ gpt-5.1<!DOCTYPE html>
 
 		<webview
 			id="webview"
-			src="http://192.168.204.102/"
-			data-home="http://192.168.204.102/"
 			nodeintegration="false"
-			webpreferences="{}"
 		></webview>
 
 		<script src="assets/js/renderer.js"></script>
+		<script>
+			window.electron.getWebviewUrl().then(url => {
+				const wv = document.getElementById('webview');
+				if (url) {
+					wv.src = url;
+					wv.setAttribute('data-home', url);
+				} else {
+					wv.insertAdjacentHTML('afterend',
+						'<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-family:sans-serif;flex-direction:column;">'
+						+ '<h2>⚠️ webviewUrl belum diatur di server-config.json</h2></div>'
+					);
+				}
+			});
+		</script>
 	</body>
 </html>

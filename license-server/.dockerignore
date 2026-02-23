@@ -1,8 +1,11 @@
 node_modules
-npm-debug.log
 .env
-.git
-.gitignore
-README.md
-.vscode
-*.log
+data/
+*.db
+*.db-shm
+*.db-wal
+database/database.json
+database/database.json.backup
+TESTING_GUIDE.md
+*.md
+!README.md

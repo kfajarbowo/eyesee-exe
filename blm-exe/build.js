@@ -39,14 +39,60 @@ const buildConfig = {
 	},
 };
 
-// Create directories if they don't exist
 function ensureDirectoryExists(dirPath) {
 	if (!fs.existsSync(dirPath)) {
 		fs.mkdirSync(dirPath, { recursive: true });
 	}
 }
 
-// Build function
+// Copy extra files ke output directory setelah build
+function copyExtraFiles(outputDir) {
+	const filesToCopy = [
+		// icudtl.dat - WAJIB untuk Electron 28+ agar app bisa dibuka
+		{
+			src: path.join('node_modules', 'electron', 'dist', 'icudtl.dat'),
+			dest: 'icudtl.dat',
+			required: true
+		},
+		// server-config.json - URL license server
+		{
+			src: 'server-config.json',
+			dest: 'server-config.json',
+			required: false
+		},
+	];
+
+	console.log('\n📋 Copying extra files...');
+
+	for (const file of filesToCopy) {
+		const srcPath = path.join(__dirname, file.src);
+		const destPath = path.join(outputDir, file.dest);
+
+		if (fs.existsSync(srcPath)) {
+			fs.copyFileSync(srcPath, destPath);
+			console.log(`  ✅ Copied: ${file.dest}`);
+		} else if (file.required) {
+			console.error(`  ❌ REQUIRED file not found: ${file.src}`);
+			process.exit(1);
+		} else {
+			console.warn(`  ⚠️  Optional file not found (skipped): ${file.src}`);
+		}
+	}
+}
+
+// Find the actual output folder created by electron-packager
+function findOutputFolder(baseOutDir, platform, arch) {
+	if (!fs.existsSync(baseOutDir)) return null;
+
+	const entries = fs.readdirSync(baseOutDir);
+	const match = entries.find(e => {
+		const stat = fs.statSync(path.join(baseOutDir, e));
+		return stat.isDirectory() && e.includes(platform) && e.includes(arch);
+	});
+
+	return match ? path.join(baseOutDir, match) : null;
+}
+
 function build(platform) {
 	const config = buildConfig[platform];
 	if (!config) {
@@ -54,25 +100,39 @@ function build(platform) {
 		process.exit(1);
 	}
 
-	console.log(`Building for ${platform}...`);
+	console.log(`\n🔨 Building for ${platform}...`);
 
 	const packageCmd = `electron-packager . ${getPackageArgs(config)}`;
 
 	try {
 		execSync(packageCmd, { stdio: 'inherit' });
-		console.log(`✅ Build completed for ${platform}`);
-		console.log(`📦 Output: ${config.out}/`);
+		console.log(`\n✅ Build completed for ${platform}`);
+
+		// Find output folder
+		const archMap = { win32: 'x64', darwin: 'x64', linux: 'x64' };
+		const outputFolder = findOutputFolder(
+			path.join(__dirname, config.out),
+			config.target,
+			archMap[config.target] || 'x64'
+		);
+
+		if (outputFolder) {
+			copyExtraFiles(outputFolder);
+			console.log(`\n📦 Output: ${outputFolder}`);
+		} else {
+			console.warn('⚠️  Could not find output folder for extra files.');
+		}
+
 	} catch (error) {
 		console.error(`❌ Build failed for ${platform}:`, error.message);
 		process.exit(1);
 	}
 }
 
-// Get package arguments
 function getPackageArgs(config) {
 	let args = [
 		'--overwrite',
-		'--asar=true',
+		'--asar',
 		`--platform=${config.target}`,
 		`--arch=${config.arch}`,
 		`--icon=${config.icon}`,
@@ -80,7 +140,6 @@ function getPackageArgs(config) {
 		'--prune=true',
 	];
 
-	// Add version string for Windows
 	if (config.extra && config.extra.VersionString) {
 		Object.entries(config.extra.VersionString).forEach(([key, value]) => {
 			args.push(`--version-string.${key}="${value}"`);
@@ -90,7 +149,7 @@ function getPackageArgs(config) {
 	return args.join(' ');
 }
 
-// Main build process
+// Main
 const platform = process.argv[2];
 if (!platform) {
 	console.error('Please specify platform: windows, macos, or linux');
@@ -98,7 +157,6 @@ if (!platform) {
 	process.exit(1);
 }
 
-// Ensure output directories exist
 Object.values(buildConfig).forEach(config => {
 	ensureDirectoryExists(config.out);
 });

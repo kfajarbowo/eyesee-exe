@@ -47,16 +47,35 @@ function getServerUrl() {
     }
 
     // 3. Default (Localhost)
-    return 'http://127.0.0.1:3000';
+    return 'http://127.0.0.1:3001';
 }
 
 const LICENSE_SERVER_URL = getServerUrl();
 
-// Treat insecure origins as secure for local network streaming
-app.commandLine.appendSwitch(
-    'unsafely-treat-insecure-origin-as-secure',
-    'http://192.168.204.105:5000'
-);
+// Webview URL dari server-config.json
+function getWebviewUrl() {
+    if (process.env.WEBVIEW_URL) return process.env.WEBVIEW_URL;
+    const configPath = app.isPackaged
+        ? path.join(path.dirname(process.execPath), 'server-config.json')
+        : path.join(__dirname, 'server-config.json');
+    try {
+        if (fs.existsSync(configPath)) {
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            if (config.webviewUrl) return config.webviewUrl;
+        }
+    } catch (e) { console.error('[App] webview URL error:', e.message); }
+    return null;
+}
+const WEBVIEW_URL = getWebviewUrl();
+console.log('[VComm] Webview URL:', WEBVIEW_URL || '(not set)');
+
+// Izinkan akses kamera/mic via HTTP lokal (diperlukan untuk VComm)
+if (WEBVIEW_URL) {
+    app.commandLine.appendSwitch(
+        'unsafely-treat-insecure-origin-as-secure',
+        WEBVIEW_URL
+    );
+}
 
 // ============================================================================
 // Window Management
@@ -226,3 +245,6 @@ ipcMain.on('license-activated', () => {
 ipcMain.handle('deactivate-license', async () => {
     return licenseManager.deactivateLicense();
 });
+
+// Webview URL (dibaca dari server-config.json)
+ipcMain.handle('get-webview-url', async () => WEBVIEW_URL);

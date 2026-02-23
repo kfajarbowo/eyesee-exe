@@ -6,6 +6,13 @@
     "scripts": {
         "start": "node server.js",
         "dev": "node --watch server.js",
+        "seed": "node scripts/seed.js",
+        "seed:bms": "node scripts/seed.js --product BM01 --qty 5",
+        "seed:blm": "node scripts/seed.js --product BL01 --qty 5",
+        "seed:vcomm": "node scripts/seed.js --product VC01 --qty 5",
+        "seed:eyesee": "node scripts/seed.js --product ES01 --qty 5",
+        "seed:admin": "node scripts/seed-admin.js",
+        "seed:admin:list": "node scripts/seed-admin.js --list",
         "precheck": "node scripts/pre-deploy-check.js"
     },
     "dependencies": {

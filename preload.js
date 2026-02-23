@@ -23,5 +23,11 @@ contextBridge.exposeInMainWorld("electron", {
 	licenseActivated: () => ipcRenderer.invoke('license-activated'),
 	
 	// Deactivate license
-	deactivateLicense: () => ipcRenderer.invoke('deactivate-license')
+	deactivateLicense: () => ipcRenderer.invoke('deactivate-license'),
+
+	// Get server URL (debug)
+	getServerUrl: () => ipcRenderer.invoke('get-server-url'),
+
+	// Get webview URL dari server-config.json
+	getWebviewUrl: () => ipcRenderer.invoke('get-webview-url')
 });

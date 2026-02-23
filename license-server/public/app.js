@@ -8,21 +8,45 @@
 // ============================================================================
 
 const API_BASE = window.location.origin;
-const ADMIN_TOKEN = 'admin123'; // Change this in production
+
+// Ambil token dari localStorage (diset saat login)
+function getToken() {
+    return localStorage.getItem('admin_token') || '';
+}
+
+// Jika belum login, redirect ke halaman login
+function checkAuth() {
+    if (!getToken()) {
+        window.location.href = '/login.html';
+        return false;
+    }
+    return true;
+}
+
+// Logout
+function logout() {
+    localStorage.removeItem('admin_token');
+    window.location.href = '/login.html';
+}
 
 // Store data
 let allGeneratedKeys = [];
 let allLicenses = [];
 let stats = null;
 
+// Pagination state
+const PAGE_SIZE = 10;
+let keysPage = 1;
+let licensesPage = 1;
+
 // ============================================================================
 // Initialize
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (!checkAuth()) return;
     // Load initial data
     refreshAll();
-
     // Setup form handlers
     document.getElementById('generateForm').addEventListener('submit', handleGenerateKeys);
 });
@@ -36,7 +60,7 @@ async function apiCall(method, endpoint, body = null) {
         method,
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${ADMIN_TOKEN}`
+            'Authorization': `Bearer ${getToken()}`
         }
     };
 
@@ -47,6 +71,13 @@ async function apiCall(method, endpoint, body = null) {
     try {
         const response = await fetch(`${API_BASE}${endpoint}`, options);
         const data = await response.json();
+        
+        // Jika 401/403 → token expired atau salah → redirect ke login
+        if (response.status === 401 || response.status === 403) {
+            localStorage.removeItem('admin_token');
+            window.location.href = '/login.html';
+            return;
+        }
         
         if (!response.ok) {
             throw new Error(data.error || `HTTP ${response.status}`);
@@ -138,18 +169,24 @@ function displayGeneratedKeys() {
     
     if (allGeneratedKeys.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="no-data">Tidak ada data</td></tr>';
+        renderPagination('keysPagination', 0, keysPage, () => {});
         return;
     }
 
-    // Apply filters
     const filtered = filterKeys();
     
     if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="no-data">Tidak ada hasil</td></tr>';
+        renderPagination('keysPagination', 0, keysPage, () => {});
         return;
     }
 
-    tbody.innerHTML = filtered.map(key => `
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    if (keysPage > totalPages) keysPage = totalPages;
+    const start = (keysPage - 1) * PAGE_SIZE;
+    const paged = filtered.slice(start, start + PAGE_SIZE);
+
+    tbody.innerHTML = paged.map(key => `
         <tr>
             <td class="license-key-cell">${key.license_key}</td>
             <td>
@@ -164,12 +201,17 @@ function displayGeneratedKeys() {
                 ${formatDate(key.generated_at)}
             </td>
             <td>
-                <button class="btn-secondary btn-sm" onclick="copyToClipboard('${key.license_key}')">
+                <button class="btn-secondary btn-sm" onclick="copyToClipboard('${key.license_key}', this)">
                     Copy
                 </button>
             </td>
         </tr>
     `).join('');
+
+    renderPagination('keysPagination', filtered.length, keysPage, (p) => {
+        keysPage = p;
+        displayGeneratedKeys();
+    });
 }
 
 function displayLicenses() {
@@ -177,18 +219,24 @@ function displayLicenses() {
     
     if (allLicenses.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="no-data">Tidak ada lisensi aktif</td></tr>';
+        renderPagination('licensesPagination', 0, licensesPage, () => {});
         return;
     }
 
-    // Apply filters
     const filtered = filterLicenseList();
     
     if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="no-data">Tidak ada hasil</td></tr>';
+        renderPagination('licensesPagination', 0, licensesPage, () => {});
         return;
     }
 
-    tbody.innerHTML = filtered.map(license => `
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    if (licensesPage > totalPages) licensesPage = totalPages;
+    const start = (licensesPage - 1) * PAGE_SIZE;
+    const paged = filtered.slice(start, start + PAGE_SIZE);
+
+    tbody.innerHTML = paged.map(license => `
         <tr>
             <td class="hardware-id-cell">${license.hardware_id.substring(0, 35)}</td>
             <td>${license.device_name || '-'}</td>
@@ -218,7 +266,13 @@ function displayLicenses() {
             </td>
         </tr>
     `).join('');
+
+    renderPagination('licensesPagination', filtered.length, licensesPage, (p) => {
+        licensesPage = p;
+        displayLicenses();
+    });
 }
+
 
 // ============================================================================
 // Filter Functions
@@ -249,11 +303,60 @@ function filterLicenseList() {
 }
 
 function filterGeneratedKeys() {
+    keysPage = 1; // reset ke halaman 1 saat filter berubah
     displayGeneratedKeys();
 }
 
 function filterLicenses() {
+    licensesPage = 1;
     displayLicenses();
+}
+
+// ============================================================================
+// Pagination Helper
+// ============================================================================
+
+function renderPagination(containerId, totalItems, currentPage, onPageChange) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+
+    if (totalPages <= 1) {
+        container.innerHTML = totalItems > 0
+            ? `<span class="pagination-info">${totalItems} item</span>`
+            : '';
+        return;
+    }
+
+    const start = (currentPage - 1) * PAGE_SIZE + 1;
+    const end = Math.min(currentPage * PAGE_SIZE, totalItems);
+
+    let pages = [];
+    // Always show first, last, current ± 1
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+            pages.push(i);
+        } else if (pages[pages.length - 1] !== '...') {
+            pages.push('...');
+        }
+    }
+
+    container.innerHTML = `
+        <div class="pagination">
+            <span class="pagination-info">${start}–${end} dari ${totalItems}</span>
+            <div class="pagination-buttons">
+                <button class="page-btn" ${currentPage === 1 ? 'disabled' : ''}
+                    onclick="(${onPageChange.toString()})(${currentPage - 1})">&laquo;</button>
+                ${pages.map(p => p === '...'
+                    ? '<span class="page-ellipsis">...</span>'
+                    : `<button class="page-btn ${p === currentPage ? 'active' : ''}" onclick="(${onPageChange.toString()})(${p})">${p}</button>`
+                ).join('')}
+                <button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''}
+                    onclick="(${onPageChange.toString()})(${currentPage + 1})">&raquo;</button>
+            </div>
+        </div>
+    `;
 }
 
 // ============================================================================
@@ -280,7 +383,7 @@ async function handleGenerateKeys(e) {
 
         const response = await apiCall('POST', '/api/admin/generate-keys', {
             productCode,
-            quantity
+            count: quantity  // server expects 'count', not 'quantity'
         });
 
         // Show result
@@ -395,20 +498,21 @@ function formatDate(dateString) {
     });
 }
 
-function copyToClipboard(text) {
+function copyToClipboard(text, btnEl) {
     navigator.clipboard.writeText(text).then(() => {
-        // Visual feedback
-        const btn = event.target;
-        const originalText = btn.textContent;
-        btn.textContent = '✓ Copied';
-        btn.style.background = 'var(--success-500)';
-        btn.style.color = 'white';
-        
-        setTimeout(() => {
-            btn.textContent = originalText;
-            btn.style.background = '';
-            btn.style.color = '';
-        }, 1500);
+        // Visual feedback hanya jika ada button yang diklik
+        if (btnEl) {
+            const originalText = btnEl.textContent;
+            btnEl.textContent = '✓ Copied';
+            btnEl.style.background = 'var(--success-500)';
+            btnEl.style.color = 'white';
+            
+            setTimeout(() => {
+                btnEl.textContent = originalText;
+                btnEl.style.background = '';
+                btnEl.style.color = '';
+            }, 1500);
+        }
     }).catch(err => {
         alert('Gagal copy: ' + err.message);
     });
@@ -416,7 +520,7 @@ function copyToClipboard(text) {
 
 function copyAllGeneratedKeys(keys) {
     const text = keys.join('\n');
-    copyToClipboard(text);
+    copyToClipboard(text, null);
 }
 
 function showError(message) {

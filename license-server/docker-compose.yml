@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  license-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eyesee-license-server
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3001
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - OFFLINE_TOLERANCE_HOURS=${OFFLINE_TOLERANCE_HOURS:-24}
+    volumes:
+      # Persist SQLite database outside container
+      - license-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/license/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  license-data:
+    driver: local

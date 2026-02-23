@@ -12,14 +12,14 @@
         <div class="container">
             <div class="header-content">
                 <div class="logo-section">
-                    <h1>🔐License Server</h1>
-                    <p class="subtitle">Admin Panel v1.0</p>
+                    <h1>License Server</h1>
+                    <p class="subtitle">Admin Panel</p>
                 </div>
-                <!-- <div class="header-actions">
-                    <button class="btn-refresh" onclick="refreshAll()">
-                        <span class="icon">🔄</span> Refresh
+                <div class="header-actions">
+                    <button class="btn-refresh" onclick="logout()" style="background:#ef4444;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">
+                        🚪 Logout
                     </button>
-                </div> -->
+                </div>
             </div>
         </div>
     </header>
@@ -123,6 +123,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div id="keysPagination"></div>
             </div>
         </section>
 
@@ -171,6 +172,7 @@
                         </tbody>
                     </table>
                 </div>
+                <div id="licensesPagination"></div>
             </div>
         </section>
     </div>

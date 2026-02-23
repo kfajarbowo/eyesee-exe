@@ -61,6 +61,19 @@ function initializeDatabase() {
         );
     `);
 
+    // Admin Users Table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS admin_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'admin',
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now')),
+            last_login_at TEXT
+        );
+    `);
+
     // Indexes for better query performance
     db.exec(`
         CREATE INDEX IF NOT EXISTS idx_generated_keys_product 
@@ -77,6 +90,9 @@ function initializeDatabase() {
         
         CREATE INDEX IF NOT EXISTS idx_active_licenses_revoked 
         ON active_licenses(is_revoked);
+
+        CREATE INDEX IF NOT EXISTS idx_admin_users_username
+        ON admin_users(username);
     `);
 
     console.log('[DB] Database initialized successfully');
