@@ -1,11 +1,12 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execSync } = require('child_process');
 
 const buildConfig = {
 	windows: {
 		target: 'win32',
-		arch: 'ia32',  // VComm pakai 32-bit
+		arch: 'ia32',
 		icon: 'assets/icons/win/logo-eyesee.ico',
 		out: 'release-builds/windows',
 		extra: {
@@ -89,10 +90,36 @@ function findOutputFolder(baseOutDir, platform) {
 	if (!fs.existsSync(baseOutDir)) return null;
 	const entries = fs.readdirSync(baseOutDir);
 	const match = entries.find(e => {
-		const stat = fs.statSync(path.join(baseOutDir, e));
-		return stat.isDirectory() && e.toLowerCase().includes(platform);
+		try {
+			const stat = fs.statSync(path.join(baseOutDir, e));
+			return stat.isDirectory() && e.toLowerCase().includes(platform);
+		} catch { return false; }
 	});
 	return match ? path.join(baseOutDir, match) : null;
+}
+
+function clearPackagerTemp() {
+	const tempDir = path.join(process.env.TEMP || process.env.TMP || os.tmpdir(), 'electron-packager');
+	if (fs.existsSync(tempDir)) {
+		try {
+			execSync(`rmdir /s /q "${tempDir}"`, { stdio: 'ignore', shell: true });
+			console.log('🧹 Cleared electron-packager temp cache');
+		} catch (e) {
+			console.warn('⚠️  Could not clear temp cache:', e.message);
+		}
+	}
+}
+
+function forceDeleteOutputFolder(config) {
+	const baseOutDir = path.join(__dirname, config.out);
+	if (!fs.existsSync(baseOutDir)) return;
+
+	try {
+		execSync(`rmdir /s /q "${baseOutDir}"`, { stdio: 'ignore', shell: true });
+		console.log(`🗑️  Cleared output dir: ${config.out}`);
+	} catch (e) {
+		console.warn(`⚠️  Could not clear output dir (${e.message}), --overwrite will handle it`);
+	}
 }
 
 function build(platform) {
@@ -103,6 +130,9 @@ function build(platform) {
 	}
 
 	console.log(`\n🔨 Building VComm for ${platform} (${config.arch})...`);
+
+	clearPackagerTemp();
+	forceDeleteOutputFolder(config);
 
 	const packageCmd = `npx electron-packager . ${getPackageArgs(config)}`;
 
@@ -131,12 +161,14 @@ function build(platform) {
 function getPackageArgs(config) {
 	let args = [
 		'--overwrite',
-		'--asar',
 		`--platform=${config.target}`,
 		`--arch=${config.arch}`,
 		`--icon=${config.icon}`,
 		`--out=${config.out}`,
-		'--prune=true',
+		// Ignore release-builds agar EXE lama tidak ikut dikopi ke temp (ENOSPC fix)
+		'--ignore="^/release-builds"',
+		'--ignore="^/node_modules/.bin"',
+		// TIDAK pakai --prune=true
 	];
 
 	if (config.extra && config.extra.VersionString) {

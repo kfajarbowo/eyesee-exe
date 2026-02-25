@@ -341,15 +341,18 @@ router.delete('/licenses/:hardwareId/:productCode', (req, res) => {
             });
         }
 
-        // Reset generated key ke unused
-        const generatedKey = generatedKeysRepo.findByKey(license.license_key);
-        if (generatedKey) {
-            generatedKeysRepo.resetKeyToUnused(license.license_key);
+        // Reset generated key ke unused (agar bisa dipakai ulang)
+        if (license.license_key) {
+            const generatedKey = generatedKeysRepo.findByKey(license.license_key);
+            if (generatedKey) {
+                generatedKeysRepo.resetKeyToUnused(license.license_key);
+                console.log(`[ADMIN] KEY RESET: ${license.license_key} → UNUSED`);
+            }
         }
 
         licenseRepo.deleteByHardwareIdAndProduct(hardwareId, productCode);
 
-        console.log(`[ADMIN] DELETED: ${hardwareId.substring(0, 8)}... product=${productCode} (key reset)`);
+        console.log(`[ADMIN] DELETED: ${hardwareId.substring(0, 8)}... product=${productCode} (key reset to unused)`);
         res.json({
             success: true,
             message: `License ${productCode} dihapus, key dapat digunakan kembali`
@@ -361,24 +364,39 @@ router.delete('/licenses/:hardwareId/:productCode', (req, res) => {
     }
 });
 
-// DELETE semua license untuk 1 hardware ID
+// DELETE semua license untuk 1 hardware ID (reset SEMUA generated keys terkait)
 router.delete('/licenses/:hardwareId', (req, res) => {
     try {
         const { hardwareId } = req.params;
-        const license = licenseRepo.findByHardwareId(hardwareId);
-        if (!license) {
+
+        // Ambil SEMUA license untuk hardware ID ini (bisa banyak produk)
+        const allLicensesForDevice = licenseRepo.getAll().filter(
+            l => l.hardware_id === hardwareId
+        );
+
+        if (allLicensesForDevice.length === 0) {
             return res.status(404).json({ success: false, error: 'License not found' });
         }
-        
-        const generatedKey = generatedKeysRepo.findByKey(license.license_key);
-        if (generatedKey) {
-            generatedKeysRepo.resetKeyToUnused(license.license_key);
+
+        // Reset SEMUA generated keys ke unused
+        for (const license of allLicensesForDevice) {
+            if (license.license_key) {
+                const generatedKey = generatedKeysRepo.findByKey(license.license_key);
+                if (generatedKey) {
+                    generatedKeysRepo.resetKeyToUnused(license.license_key);
+                    console.log(`[ADMIN] KEY RESET: ${license.license_key} (${license.product_code}) → UNUSED`);
+                }
+            }
         }
-        
+
+        // Hapus semua license untuk hardware ID ini
         licenseRepo.deleteByHardwareId(hardwareId);
 
-        console.log(`[ADMIN] DELETED: ${hardwareId.substring(0, 8)}... (key reset to unused)`);
-        res.json({ success: true, message: 'License deleted permanently, key can be reused' });
+        console.log(`[ADMIN] DELETED ALL: ${hardwareId.substring(0, 8)}... (${allLicensesForDevice.length} licenses, all keys reset to unused)`);
+        res.json({
+            success: true,
+            message: `${allLicensesForDevice.length} license(s) deleted permanently, all keys can be reused`
+        });
 
     } catch (error) {
         console.error('[ADMIN] Delete error:', error);

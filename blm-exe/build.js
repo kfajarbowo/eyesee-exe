@@ -1,13 +1,13 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execSync } = require('child_process');
 
-// Build configuration
 const buildConfig = {
 	windows: {
 		target: 'win32',
 		arch: 'x64',
-		icon: 'assets/icons/win/blm-webview.ico',
+		icon: 'assets/icons/win/icon.ico',
 		out: 'release-builds/windows',
 		extra: {
 			VersionString: {
@@ -23,13 +23,6 @@ const buildConfig = {
 		arch: 'x64',
 		icon: 'assets/icons/mac/icon.icns',
 		out: 'release-builds/mac',
-		extra: {
-			VersionString: {
-				CompanyName: 'BLM',
-				FileDescription: 'BLM Webview Application',
-				ProductName: 'BLM Webview',
-			},
-		},
 	},
 	linux: {
 		target: 'linux',
@@ -45,16 +38,13 @@ function ensureDirectoryExists(dirPath) {
 	}
 }
 
-// Copy extra files ke output directory setelah build
 function copyExtraFiles(outputDir) {
 	const filesToCopy = [
-		// icudtl.dat - WAJIB untuk Electron 28+ agar app bisa dibuka
 		{
 			src: path.join('node_modules', 'electron', 'dist', 'icudtl.dat'),
 			dest: 'icudtl.dat',
 			required: true
 		},
-		// server-config.json - URL license server
 		{
 			src: 'server-config.json',
 			dest: 'server-config.json',
@@ -80,17 +70,42 @@ function copyExtraFiles(outputDir) {
 	}
 }
 
-// Find the actual output folder created by electron-packager
 function findOutputFolder(baseOutDir, platform, arch) {
 	if (!fs.existsSync(baseOutDir)) return null;
 
 	const entries = fs.readdirSync(baseOutDir);
 	const match = entries.find(e => {
-		const stat = fs.statSync(path.join(baseOutDir, e));
-		return stat.isDirectory() && e.includes(platform) && e.includes(arch);
+		try {
+			const stat = fs.statSync(path.join(baseOutDir, e));
+			return stat.isDirectory() && e.includes(platform) && e.includes(arch);
+		} catch { return false; }
 	});
 
 	return match ? path.join(baseOutDir, match) : null;
+}
+
+function clearPackagerTemp() {
+	const tempDir = path.join(process.env.TEMP || process.env.TMP || os.tmpdir(), 'electron-packager');
+	if (fs.existsSync(tempDir)) {
+		try {
+			execSync(`rmdir /s /q "${tempDir}"`, { stdio: 'ignore', shell: true });
+			console.log('🧹 Cleared electron-packager temp cache');
+		} catch (e) {
+			console.warn('⚠️  Could not clear temp cache:', e.message);
+		}
+	}
+}
+
+function forceDeleteOutputFolder(config) {
+	const baseOutDir = path.join(__dirname, config.out);
+	if (!fs.existsSync(baseOutDir)) return;
+
+	try {
+		execSync(`rmdir /s /q "${baseOutDir}"`, { stdio: 'ignore', shell: true });
+		console.log(`🗑️  Cleared output dir: ${config.out}`);
+	} catch (e) {
+		console.warn(`⚠️  Could not clear output dir (${e.message}), --overwrite will handle it`);
+	}
 }
 
 function build(platform) {
@@ -100,15 +115,17 @@ function build(platform) {
 		process.exit(1);
 	}
 
-	console.log(`\n🔨 Building for ${platform}...`);
+	console.log(`\n🔨 Building BLM for ${platform} (${config.arch})...`);
 
-	const packageCmd = `electron-packager . ${getPackageArgs(config)}`;
+	clearPackagerTemp();
+	forceDeleteOutputFolder(config);
+
+	const packageCmd = `npx electron-packager . ${getPackageArgs(config)}`;
 
 	try {
 		execSync(packageCmd, { stdio: 'inherit' });
 		console.log(`\n✅ Build completed for ${platform}`);
 
-		// Find output folder
 		const archMap = { win32: 'x64', darwin: 'x64', linux: 'x64' };
 		const outputFolder = findOutputFolder(
 			path.join(__dirname, config.out),
@@ -132,12 +149,14 @@ function build(platform) {
 function getPackageArgs(config) {
 	let args = [
 		'--overwrite',
-		'--asar',
 		`--platform=${config.target}`,
 		`--arch=${config.arch}`,
 		`--icon=${config.icon}`,
 		`--out=${config.out}`,
-		'--prune=true',
+		// Ignore release-builds agar EXE lama tidak ikut dikopi ke temp (ENOSPC fix)
+		'--ignore="^/release-builds"',
+		'--ignore="^/node_modules/.bin"',
+		// TIDAK pakai --prune=true
 	];
 
 	if (config.extra && config.extra.VersionString) {
@@ -149,7 +168,6 @@ function getPackageArgs(config) {
 	return args.join(' ');
 }
 
-// Main
 const platform = process.argv[2];
 if (!platform) {
 	console.error('Please specify platform: windows, macos, or linux');

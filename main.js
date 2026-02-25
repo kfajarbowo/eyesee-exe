@@ -122,6 +122,12 @@ function createMainWindow() {
 	const window = require('./src/window');
 	mainWindow = window.createBrowserWindow();
 
+	// Build menu AFTER mainWindow is assigned so the reference is valid
+	const menu = require('./src/menu');
+	const template = menu.createTemplate(app.name, mainWindow);
+	const builtMenu = Menu.buildFromTemplate(template);
+	Menu.setApplicationMenu(builtMenu);
+
 	// Add event listeners for window state changes
 	mainWindow.on('maximize', () => {
 		mainWindow.webContents.send('window-state-changed', 'maximized');
@@ -141,12 +147,6 @@ function createMainWindow() {
 
 	// Load the main content
 	mainWindow.loadFile('index.html');
-
-	// Menu (for standard keyboard shortcuts)
-	const menu = require('./src/menu');
-	const template = menu.createTemplate(app.name, mainWindow);
-	const builtMenu = Menu.buildFromTemplate(template);
-	Menu.setApplicationMenu(builtMenu);
 
 	// Print function (if enabled)
 	require('./src/print');
@@ -283,66 +283,47 @@ ipcMain.handle('get-license-reminder', async () => {
 	return licenseManager.getReminder();
 });
 
-// Show license info dialog (from Help menu)
+// Show license info dialog (from Help menu) — async-safe
 ipcMain.on('show-license-info', async () => {
 	if (!mainWindow) return;
 	
 	try {
-		const info = licenseManager.getLicenseInfo();
-		
+		// getLicenseInfo is async
+		const info = await licenseManager.getLicenseInfo();
+		const status = info && info.status ? info.status : 'not_activated';
+
+		let statusIcon = '';
 		let statusText = '';
-		switch (info.status) {
-			case 'valid':
-				statusText = '✅ AKTIF';
-				break;
-			case 'grace_period':
-				statusText = '⚠️ MASA TENGGANG';
-				break;
-			case 'expired':
-				statusText = '❌ EXPIRED';
-				break;
-			case 'not_activated':
-				statusText = '🔒 BELUM AKTIVASI';
-				break;
-			default:
-				statusText = info.status.toUpperCase();
+		switch (status) {
+			case 'valid':         statusIcon = '✅'; statusText = 'AKTIF'; break;
+			case 'offline_valid': statusIcon = '🟡'; statusText = 'AKTIF (Offline)'; break;
+			case 'grace_period':  statusIcon = '⚠️'; statusText = 'MASA TENGGANG'; break;
+			case 'expired':       statusIcon = '❌'; statusText = 'EXPIRED'; break;
+			case 'revoked':       statusIcon = '🚫'; statusText = 'DICABUT'; break;
+			case 'not_activated': statusIcon = '🔒'; statusText = 'BELUM AKTIVASI'; break;
+			default:              statusIcon = 'ℹ️'; statusText = String(status).toUpperCase();
 		}
-		
-		let details = `Status: ${statusText}\n`;
-		
-		if (info.expiryDate) {
-			details += `\nTanggal Expired: ${info.expiryDate.toLocaleDateString('id-ID', {
-				weekday: 'long',
-				year: 'numeric',
-				month: 'long',
-				day: 'numeric'
-			})}`;
-		}
-		
-		if (info.daysUntilExpiry !== null) {
-			if (info.daysUntilExpiry > 0) {
-				details += `\nSisa Waktu: ${info.daysUntilExpiry} hari`;
-			} else if (info.daysUntilExpiry < 0) {
-				details += `\nExpired: ${Math.abs(info.daysUntilExpiry)} hari lalu`;
-			}
-		}
-		
-		if (info.gracePeriodRemaining !== null) {
-			details += `\nSisa Grace Period: ${info.gracePeriodRemaining} hari`;
-		}
-		
-		details += `\n\nHardware ID: ${info.hardwareId}`;
+
+		const licenseKey  = info?.license?.licenseKey  || info?.licenseKey  || '-';
+		const productCode = info?.license?.productCode || info?.productCode || '-';
+		const hardwareId  = info?.hardwareId || '-';
+
+		let details = `Status  : ${statusIcon} ${statusText}\n`;
+		details += `Produk  : ${productCode}\n`;
+		details += `\nLicense Key:\n${licenseKey}\n`;
+		details += `\nHardware ID:\n${hardwareId}`;
+		if (info?.message && status !== 'valid') details += `\n\nInfo: ${info.message}`;
 		
 		dialog.showMessageBox(mainWindow, {
-			type: info.status === 'valid' ? 'info' : 'warning',
-			title: 'Informasi Lisensi',
+			type: status === 'valid' || status === 'offline_valid' ? 'info' : 'warning',
+			title: 'Informasi Lisensi — EyeSee',
 			message: 'EyeSee License',
 			detail: details,
 			buttons: ['OK']
 		});
 		
 	} catch (error) {
-		dialog.showErrorBox('Error', 'Gagal memuat informasi lisensi.');
+		dialog.showErrorBox('Error', 'Gagal memuat informasi lisensi: ' + error.message);
 	}
 });
 

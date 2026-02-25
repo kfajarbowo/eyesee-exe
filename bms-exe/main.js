@@ -123,6 +123,10 @@ function createMainWindow() {
     mainWindow.setIcon(path.join(__dirname, 'assets/icons/png/logo-bms.png'));
     mainWindow.loadURL(`file://${__dirname}/index.html`);
 
+    // Build menu AFTER mainWindow is assigned so window reference is valid
+    menu.createMenu(mainWindow);
+    print.setupPrint();
+
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
@@ -149,9 +153,7 @@ async function initializeApp() {
         switch (validation.status) {
             case LicenseStatus.VALID:
             case LicenseStatus.OFFLINE_VALID:
-                // License valid - start app
-                menu.createMenu(mainWindow);
-                print.setupPrint();
+                // License valid - start app (menu & print created inside createMainWindow)
                 createMainWindow();
                 
                 // Show offline warning if applicable
@@ -257,8 +259,7 @@ ipcMain.on('license-activated', () => {
     if (licenseWindow) {
         licenseWindow.close();
     }
-    menu.createMenu(mainWindow);
-    print.setupPrint();
+    // menu & print are now created inside createMainWindow
     createMainWindow();
 });
 

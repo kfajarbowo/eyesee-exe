@@ -122,6 +122,10 @@ function createMainWindow() {
     mainWindow.setIcon(path.join(__dirname, 'assets/icons/png/logo-eyesee.png'));
     mainWindow.loadURL(`file://${__dirname}/index.html`);
 
+    // Build menu AFTER mainWindow is assigned so window reference is valid
+    menu.createMenu(mainWindow);
+    print.setupPrint();
+
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
@@ -142,8 +146,7 @@ async function initializeApp() {
         switch (validation.status) {
             case LicenseStatus.VALID:
             case LicenseStatus.OFFLINE_VALID:
-                menu.createMenu(mainWindow);
-                print.setupPrint();
+                // menu & print are created inside createMainWindow
                 createMainWindow();
                 
                 if (validation.status === LicenseStatus.OFFLINE_VALID) {
@@ -237,8 +240,7 @@ ipcMain.on('license-activated', () => {
     if (licenseWindow) {
         licenseWindow.close();
     }
-    menu.createMenu(mainWindow);
-    print.setupPrint();
+    // menu & print are created inside createMainWindow
     createMainWindow();
 });
 

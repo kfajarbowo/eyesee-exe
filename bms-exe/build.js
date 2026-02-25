@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execSync } = require('child_process');
 
 const buildConfig = {
@@ -74,11 +75,37 @@ function findOutputFolder(baseOutDir, platform, arch) {
 
 	const entries = fs.readdirSync(baseOutDir);
 	const match = entries.find(e => {
-		const stat = fs.statSync(path.join(baseOutDir, e));
-		return stat.isDirectory() && e.includes(platform) && e.includes(arch);
+		try {
+			const stat = fs.statSync(path.join(baseOutDir, e));
+			return stat.isDirectory() && e.includes(platform) && e.includes(arch);
+		} catch { return false; }
 	});
 
 	return match ? path.join(baseOutDir, match) : null;
+}
+
+function clearPackagerTemp() {
+	const tempDir = path.join(process.env.TEMP || process.env.TMP || os.tmpdir(), 'electron-packager');
+	if (fs.existsSync(tempDir)) {
+		try {
+			execSync(`rmdir /s /q "${tempDir}"`, { stdio: 'ignore', shell: true });
+			console.log('🧹 Cleared electron-packager temp cache');
+		} catch (e) {
+			console.warn('⚠️  Could not clear temp cache:', e.message);
+		}
+	}
+}
+
+function forceDeleteOutputFolder(config) {
+	const baseOutDir = path.join(__dirname, config.out);
+	if (!fs.existsSync(baseOutDir)) return;
+
+	try {
+		execSync(`rmdir /s /q "${baseOutDir}"`, { stdio: 'ignore', shell: true });
+		console.log(`🗑️  Cleared output dir: ${config.out}`);
+	} catch (e) {
+		console.warn(`⚠️  Could not clear output dir (${e.message}), --overwrite will handle it`);
+	}
 }
 
 function build(platform) {
@@ -88,9 +115,12 @@ function build(platform) {
 		process.exit(1);
 	}
 
-	console.log(`\n🔨 Building BMS for ${platform}...`);
+	console.log(`\n🔨 Building BMS for ${platform} (${config.arch})...`);
 
-	const packageCmd = `electron-packager . ${getPackageArgs(config)}`;
+	clearPackagerTemp();
+	forceDeleteOutputFolder(config);
+
+	const packageCmd = `npx electron-packager . ${getPackageArgs(config)}`;
 
 	try {
 		execSync(packageCmd, { stdio: 'inherit' });
@@ -118,12 +148,14 @@ function build(platform) {
 function getPackageArgs(config) {
 	let args = [
 		'--overwrite',
-		'--asar',
 		`--platform=${config.target}`,
 		`--arch=${config.arch}`,
 		`--icon=${config.icon}`,
 		`--out=${config.out}`,
-		'--prune=true',
+		// Ignore release-builds agar EXE lama tidak ikut dikopi ke temp (ENOSPC fix)
+		'--ignore="^/release-builds"',
+		'--ignore="^/node_modules/.bin"',
+		// TIDAK pakai --prune=true
 	];
 
 	if (config.extra && config.extra.VersionString) {

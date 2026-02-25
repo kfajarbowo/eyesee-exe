@@ -1,168 +1,182 @@
-const { app, Menu, shell, dialog } = require("electron");
+const { app, Menu, dialog } = require('electron');
+const os = require('os');
+const path = require('path');
 
-function createMenu(mainWindow) {
-	const template = [
-		{
-			label: "File",
-			submenu: [
-				{
-					label: "Quit",
-					accelerator: process.platform === "darwin" ? "Cmd+Q" : "Ctrl+Q",
-					click: () => {
-						app.quit();
-					},
-				},
-			],
-		},
-		{
-			label: "Edit",
-			submenu: [
-				{ role: "undo", label: "Undo" },
-				{ role: "redo", label: "Redo" },
-				{ type: "separator" },
-				{ role: "cut", label: "Cut" },
-				{ role: "copy", label: "Copy" },
-				{ role: "paste", label: "Paste" },
-				{ role: "selectAll", label: "Select All" },
-			],
-		},
-		{
-			label: "View",
-			submenu: [
-				{ role: "reload", label: "Reload" },
-				{ role: "forceReload", label: "Force Reload" },
-				{ role: "toggleDevTools", label: "Toggle Developer Tools" },
-				{ type: "separator" },
-				{ role: "resetZoom", label: "Actual Size" },
-				{ role: "zoomIn", label: "Zoom In" },
-				{ role: "zoomOut", label: "Zoom Out" },
-				{ type: "separator" },
-				{ role: "togglefullscreen", label: "Toggle Fullscreen" },
-			],
-		},
-		{
-			label: "Window",
-			submenu: [
-				{ role: "minimize", label: "Minimize" },
-				{ role: "close", label: "Close" },
-			],
-		},
-		{
-			label: "Help",
-			submenu: [
-				{
-					label: "View License",
-					accelerator: "CmdOrCtrl+Shift+L",
-					click: () => {
-						const { licenseManager } = require('./license');
-						
-						try {
-							const info = licenseManager.getLicenseInfo();
-							
-							let statusText = '';
-							switch (info.status) {
-								case 'valid':
-									statusText = '✅ AKTIF';
-									break;
-								case 'grace_period':
-									statusText = '⚠️ MASA TENGGANG';
-									break;
-								case 'expired':
-									statusText = '❌ EXPIRED';
-									break;
-								case 'not_activated':
-									statusText = '🔒 BELUM AKTIVASI';
-									break;
-								default:
-									statusText = info.status.toUpperCase();
-							}
-							
-							let details = `Status: ${statusText}\n`;
-							
-							if (info.expiryDate) {
-								details += `\nTanggal Expired: ${info.expiryDate.toLocaleDateString('id-ID', {
-									weekday: 'long',
-									year: 'numeric',
-									month: 'long',
-									day: 'numeric'
-								})}`;
-							}
-							
-							if (info.daysUntilExpiry !== null) {
-								if (info.daysUntilExpiry > 0) {
-									details += `\nSisa Waktu: ${info.daysUntilExpiry} hari`;
-								} else if (info.daysUntilExpiry < 0) {
-									details += `\nExpired: ${Math.abs(info.daysUntilExpiry)} hari lalu`;
-								}
-							}
-							
-							if (info.gracePeriodRemaining !== null) {
-								details += `\nSisa Grace Period: ${info.gracePeriodRemaining} hari`;
-							}
-							
-							details += `\n\nHardware ID: ${info.hardwareId}`;
-							
-							dialog.showMessageBox({
-								type: info.status === 'valid' ? 'info' : 'warning',
-								title: 'Informasi Lisensi',
-								message: 'VComm License',
-								detail: details,
-								buttons: ['OK']
-							});
-							
-						} catch (error) {
-							dialog.showErrorBox('Error', 'Gagal memuat informasi lisensi: ' + error.message);
-						}
-					},
-				},
-				{ type: "separator" },
-				{
-					label: "About VComm",
-					click: () => {
-						dialog.showMessageBox({
-							type: 'info',
-							title: 'About VComm',
-							message: 'VComm Application',
-							detail: 'Version 1.0.0\n\nElectron Webview Application',
-							buttons: ['OK']
-						});
-					},
-				},
-			],
-		},
-	];
+// ============================================================================
+// Helper: Build License Info Details (async-safe)
+// ============================================================================
 
-	// macOS specific menu adjustments
-	if (process.platform === "darwin") {
-		template.unshift({
-			label: app.getName(),
-			submenu: [
-				{ role: "about", label: "About " + app.getName() },
-				{ type: "separator" },
-				{ role: "services", label: "Services" },
-				{ type: "separator" },
-				{ role: "hide", label: "Hide " + app.getName() },
-				{ role: "hideOthers", label: "Hide Others" },
-				{ role: "unhide", label: "Show All" },
-				{ type: "separator" },
-				{ role: "quit", label: "Quit " + app.getName() },
-			],
-		});
+async function getLicenseDetails(licenseManager) {
+    try {
+        const info = await licenseManager.getLicenseInfo();
+        const status = info && info.status ? info.status : 'not_activated';
 
-		// Window menu
-		template[4].submenu = [
-			{ role: "close", label: "Close" },
-			{ role: "minimize", label: "Minimize" },
-			{ role: "zoom", label: "Zoom" },
-			{ type: "separator" },
-			{ role: "front", label: "Bring All to Front" },
-		];
-	}
+        let statusIcon = '';
+        let statusText = '';
+        switch (status) {
+            case 'valid':         statusIcon = '✅'; statusText = 'AKTIF'; break;
+            case 'offline_valid': statusIcon = '🟡'; statusText = 'AKTIF (Offline)'; break;
+            case 'grace_period':  statusIcon = '⚠️'; statusText = 'MASA TENGGANG'; break;
+            case 'expired':       statusIcon = '❌'; statusText = 'EXPIRED'; break;
+            case 'revoked':       statusIcon = '🚫'; statusText = 'DICABUT'; break;
+            case 'not_activated': statusIcon = '🔒'; statusText = 'BELUM AKTIVASI'; break;
+            default:              statusIcon = 'ℹ️'; statusText = String(status).toUpperCase();
+        }
 
-	const menu = Menu.buildFromTemplate(template);
-	Menu.setApplicationMenu(menu);
+        const licenseKey  = info?.license?.licenseKey  || info?.licenseKey  || '-';
+        const productCode = info?.license?.productCode || info?.productCode || '-';
+        const hardwareId  = info?.hardwareId || '-';
+
+        let details = `Status  : ${statusIcon} ${statusText}\n`;
+        details += `Produk  : ${productCode}\n`;
+        details += `\nLicense Key:\n${licenseKey}\n`;
+        details += `\nHardware ID:\n${hardwareId}`;
+        if (info?.message && status !== 'valid') details += `\n\nInfo: ${info.message}`;
+
+        return { isValid: status === 'valid' || status === 'offline_valid', details };
+    } catch (err) {
+        return { isValid: false, details: `Status: ❌ Gagal membaca lisensi\n\nError: ${err.message}` };
+    }
 }
 
-module.exports = {
-	createMenu,
-};
+// ============================================================================
+// Helper: Show About Dialog (VSCode-style)
+// ============================================================================
+
+function showAboutDialog(mainWindow, opts) {
+    const detail = [
+        `Versi      : ${opts.version}`,
+        `Produk     : ${opts.productName}`,
+        ``,
+        `Electron   : ${process.versions.electron}`,
+        `Node.js    : ${process.versions.node}`,
+        `Chromium   : ${process.versions.chrome}`,
+        `V8         : ${process.versions.v8}`,
+        `OS         : ${os.type()} ${os.arch()} ${os.release()}`,
+    ].join('\n');
+
+    dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: `About ${opts.appName}`,
+        message: opts.appName,
+        detail,
+        buttons: ['OK'],
+        icon: opts.iconPath || undefined
+    });
+}
+
+// ============================================================================
+// Create Menu
+// ============================================================================
+
+function createMenu(mainWindow) {
+    const { licenseManager } = require('./license');
+
+    const template = [
+        {
+            label: 'File',
+            submenu: [
+                {
+                    label: 'Quit',
+                    accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
+                    click: () => { app.quit(); },
+                },
+            ],
+        },
+        {
+            label: 'Edit',
+            submenu: [
+                { role: 'undo',      label: 'Undo'       },
+                { role: 'redo',      label: 'Redo'       },
+                { type: 'separator' },
+                { role: 'cut',       label: 'Cut'        },
+                { role: 'copy',      label: 'Copy'       },
+                { role: 'paste',     label: 'Paste'      },
+                { role: 'selectAll', label: 'Select All' },
+            ],
+        },
+        {
+            label: 'View',
+            submenu: [
+                { role: 'reload',           label: 'Reload'                  },
+                { role: 'forceReload',      label: 'Force Reload'            },
+                { role: 'toggleDevTools',   label: 'Toggle Developer Tools'  },
+                { type: 'separator' },
+                { role: 'resetZoom',        label: 'Actual Size'             },
+                { role: 'zoomIn',           label: 'Zoom In'                 },
+                { role: 'zoomOut',          label: 'Zoom Out'                },
+                { type: 'separator' },
+                { role: 'togglefullscreen', label: 'Toggle Fullscreen'       },
+            ],
+        },
+        {
+            label: 'Window',
+            submenu: [
+                { role: 'minimize', label: 'Minimize' },
+                { role: 'close',    label: 'Close'    },
+            ],
+        },
+        {
+            label: 'Help',
+            submenu: [
+                {
+                    label: 'View License',
+                    accelerator: 'CmdOrCtrl+Shift+L',
+                    click: async () => {
+                        const { isValid, details } = await getLicenseDetails(licenseManager);
+                        dialog.showMessageBox(mainWindow, {
+                            type: isValid ? 'info' : 'warning',
+                            title: 'Informasi Lisensi — VComm',
+                            message: 'VComm License',
+                            detail: details,
+                            buttons: ['OK']
+                        });
+                    },
+                },
+                { type: 'separator' },
+                {
+                    label: 'About VComm',
+                    click: () => {
+                        showAboutDialog(mainWindow, {
+                            appName: 'VComm',
+                            productName: 'VComm Application',
+                            version: app.getVersion() || '1.0.0',
+                            iconPath: path.join(__dirname, '../assets/icons/png/logo-vcomm.png')
+                        });
+                    },
+                },
+            ],
+        },
+    ];
+
+    // macOS adjustments
+    if (process.platform === 'darwin') {
+        template.unshift({
+            label: app.getName(),
+            submenu: [
+                { role: 'about',      label: 'About ' + app.getName() },
+                { type: 'separator' },
+                { role: 'services',   label: 'Services'               },
+                { type: 'separator' },
+                { role: 'hide',       label: 'Hide ' + app.getName() },
+                { role: 'hideOthers', label: 'Hide Others'            },
+                { role: 'unhide',     label: 'Show All'               },
+                { type: 'separator' },
+                { role: 'quit',       label: 'Quit ' + app.getName() },
+            ],
+        });
+
+        template[4].submenu = [
+            { role: 'close',    label: 'Close'               },
+            { role: 'minimize', label: 'Minimize'            },
+            { role: 'zoom',     label: 'Zoom'                },
+            { type: 'separator' },
+            { role: 'front',    label: 'Bring All to Front'  },
+        ];
+    }
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
+}
+
+module.exports = { createMenu };

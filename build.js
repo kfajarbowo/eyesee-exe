@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execSync } = require('child_process');
 
 const buildConfig = {
@@ -31,8 +32,6 @@ const buildConfig = {
 	},
 };
 
-// PENTING: Gunakan ^/ agar regex hanya match folder di ROOT
-// Tanpa ^/, pattern 'license-server' juga akan hapus 'src/license/license-server-client.js'!
 const IGNORE_PATTERNS = [
 	'^/blm-exe',
 	'^/bms-exe',
@@ -102,10 +101,38 @@ function findOutputFolder(baseOutDir, platform) {
 	if (!fs.existsSync(baseOutDir)) return null;
 	const entries = fs.readdirSync(baseOutDir);
 	const match = entries.find(e => {
-		const stat = fs.statSync(path.join(baseOutDir, e));
-		return stat.isDirectory() && e.toLowerCase().includes(platform);
+		try {
+			const stat = fs.statSync(path.join(baseOutDir, e));
+			return stat.isDirectory() && e.toLowerCase().includes(platform);
+		} catch { return false; }
 	});
 	return match ? path.join(baseOutDir, match) : null;
+}
+
+function clearPackagerTemp() {
+	const tempDir = path.join(process.env.TEMP || process.env.TMP || os.tmpdir(), 'electron-packager');
+	if (fs.existsSync(tempDir)) {
+		try {
+			execSync(`rmdir /s /q "${tempDir}"`, { stdio: 'ignore', shell: true });
+			console.log('🧹 Cleared electron-packager temp cache');
+		} catch (e) {
+			console.warn('⚠️  Could not clear temp cache:', e.message);
+		}
+	}
+}
+
+function forceDeleteOutputFolder(config) {
+	// Hapus SELURUH isi folder output (misal: release-builds/windows)
+	// bukan hanya subfolder, agar tidak ada sisa yang terkunci
+	const baseOutDir = path.join(__dirname, config.out);
+	if (!fs.existsSync(baseOutDir)) return;
+
+	try {
+		execSync(`rmdir /s /q "${baseOutDir}"`, { stdio: 'ignore', shell: true });
+		console.log(`🗑️  Cleared output dir: ${config.out}`);
+	} catch (e) {
+		console.warn(`⚠️  Could not clear output dir (${e.message}), --overwrite will handle it`);
+	}
 }
 
 function build(platform) {
@@ -117,6 +144,15 @@ function build(platform) {
 	}
 
 	console.log(`\n🔨 Building EyeSee for ${platform} (${config.arch})...`);
+
+	// Kill semua proses Electron/EXE yang mungkin mengunci file output
+	try {
+		execSync('taskkill /f /im "Electron webview.exe" 2>nul', { stdio: 'ignore', shell: true });
+		execSync('taskkill /f /im "electron.exe" 2>nul', { stdio: 'ignore', shell: true });
+	} catch (e) { /* tidak masalah jika tidak ada proses */ }
+
+	clearPackagerTemp();
+	forceDeleteOutputFolder(config);
 
 	const packageCmd = `npx electron-packager . ${getPackageArgs(config)}`;
 
@@ -144,13 +180,12 @@ function build(platform) {
 
 function getPackageArgs(config) {
 	let args = [
-		'--overwrite',
-		'--asar',
+		'--overwrite',          // Wajib ada agar tidak write ke "true"
 		`--platform=${config.target}`,
 		`--arch=${config.arch}`,
 		`--icon=${config.icon}`,
 		`--out=${config.out}`,
-		'--prune=true',
+		// TIDAK pakai --prune=true karena menyebabkan ENOENT/chmod error di Windows
 	];
 
 	IGNORE_PATTERNS.forEach(pattern => {

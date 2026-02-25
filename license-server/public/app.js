@@ -261,7 +261,7 @@ function displayLicenses() {
                         ? `<button class="btn-success btn-sm" onclick="reactivateLicense('${license.hardware_id}')">Reactivate</button>`
                         : `<button class="btn-danger btn-sm" onclick="revokeLicense('${license.hardware_id}')">Revoke</button>`
                     }
-                    <button class="btn-secondary btn-sm" onclick="deleteLicense('${license.hardware_id}')" style="margin-left: 5px;">🗑️ Delete</button>
+                    <button class="btn-secondary btn-sm" onclick="deleteLicense('${license.hardware_id}', '${license.product_code}')" style="margin-left: 5px;">🗑️ Delete</button>
                 </div>
             </td>
         </tr>
@@ -457,26 +457,28 @@ async function reactivateLicense(hardwareId) {
     }
 }
 
-async function deleteLicense(hardwareId) {
-    // Find and confirm the specific license
-    const license = allLicenses.find(l => l.hardware_id === hardwareId);
+async function deleteLicense(hardwareId, productCode) {
+    // Find the specific license by hardwareId + productCode
+    const license = allLicenses.find(l => l.hardware_id === hardwareId && l.product_code === productCode);
     if (!license) {
         alert('License not found!');
         return;
     }
 
-    if (!confirm(`⚠️ HAPUS LICENSE?\n\nHardware ID: ${hardwareId.substring(0, 30)}...\nProduct: ${license.product_code}\nKey: ${license.license_key}\n\nYakin?`)) return;
+    if (!confirm(`⚠️ HAPUS LICENSE?\n\nHardware ID: ${hardwareId.substring(0, 30)}...\nProduct: ${license.product_code}\nKey: ${license.license_key}\n\nHanya license produk ini yang akan dihapus.\nYakin?`)) return;
     if (!confirm('Konfirmasi: Data tidak dapat dikembalikan!')) return;
 
     // Disable all delete buttons
     document.querySelectorAll('.btn-secondary').forEach(btn => btn.disabled = true);
 
     try {
-        await apiCall('DELETE', `/api/admin/licenses/${encodeURIComponent(hardwareId)}`);
-        alert(`✓ License dihapus!\n${hardwareId.substring(0, 20)}...`);
+        // DELETE per product — hanya hapus 1 license, bukan semua
+        await apiCall('DELETE', `/api/admin/licenses/${encodeURIComponent(hardwareId)}/${encodeURIComponent(productCode)}`);
+        alert(`✓ License ${productCode} dihapus!\nKey ${license.license_key} dapat digunakan kembali.`);
         refreshAll();
     } catch (error) {
         alert('Gagal menghapus: ' + error.message);
+    } finally {
         document.querySelectorAll('.btn-secondary').forEach(btn => btn.disabled = false);
     }
 }
