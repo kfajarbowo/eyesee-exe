@@ -6,8 +6,8 @@ const { execSync } = require('child_process');
 const buildConfig = {
 	windows: {
 		target: 'win32',
-		arch: 'ia32',
-		icon: 'assets/icons/win/logo-eyesee.ico',
+		arch: 'x64',
+		icon: 'assets/icons/win/eyesee.png',
 		out: 'release-builds/windows',
 		extra: {
 			VersionString: {
@@ -27,7 +27,7 @@ const buildConfig = {
 	linux: {
 		target: 'linux',
 		arch: 'x64',
-		icon: 'assets/icons/png/logo-eyesee.png',
+		icon: 'assets/icons/png/eyesee.png',
 		out: 'release-builds/linux',
 	},
 };
@@ -167,6 +167,13 @@ function build(platform) {
 
 		if (outputFolder) {
 			copyExtraFiles(outputFolder);
+			// ⚡ Inject the custom HEVC ffmpeg.dll into the built app executable folder!
+			const hevcDll = path.join(__dirname, 'node_modules', 'electron', 'dist', 'ffmpeg.dll');
+			const targetDll = path.join(outputFolder, 'ffmpeg.dll');
+			if (fs.existsSync(hevcDll)) {
+				fs.copyFileSync(hevcDll, targetDll);
+				console.log('  🎥 Injected HEVC ffmpeg.dll into release build!');
+			}
 			console.log(`\n📦 Output: ${outputFolder}`);
 		} else {
 			console.warn('⚠️  Could not find output folder for extra files.');
@@ -185,6 +192,7 @@ function getPackageArgs(config) {
 		`--arch=${config.arch}`,
 		`--icon=${config.icon}`,
 		`--out=${config.out}`,
+		'--asar',
 		// TIDAK pakai --prune=true karena menyebabkan ENOENT/chmod error di Windows
 	];
 

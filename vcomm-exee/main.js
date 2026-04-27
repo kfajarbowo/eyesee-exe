@@ -90,7 +90,7 @@ function createLicenseWindow(message = null) {
         height: 620,
         resizable: false,
         frame: true,
-        icon: path.join(__dirname, 'assets/icons/png/logo-eyesee.png'),
+        icon: path.join(__dirname, 'assets/icons/png/icon-vcom.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -119,7 +119,7 @@ function createLicenseWindow(message = null) {
 
 function createMainWindow() {
     mainWindow = window.createWindow();
-    mainWindow.setIcon(path.join(__dirname, 'assets/icons/png/logo-eyesee.png'));
+    mainWindow.setIcon(path.join(__dirname, 'assets/icons/png/icon-vcom.png'));
     mainWindow.loadURL(`file://${__dirname}/index.html`);
 
     // Build menu AFTER mainWindow is assigned so window reference is valid

@@ -82,7 +82,7 @@ function createLicenseWindow(message = null) {
         height: 620,
         resizable: false,
         frame: true,
-        icon: path.join(__dirname, 'assets/icons/png/logo-bms.png'),
+        icon: path.join(__dirname, 'assets/icons/png/logo-blm.png'),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -111,7 +111,7 @@ function createLicenseWindow(message = null) {
 
 function createMainWindow() {
     mainWindow = window.createWindow();
-    mainWindow.setIcon(path.join(__dirname, 'assets/icons/png/logo-bms.png'));
+    mainWindow.setIcon(path.join(__dirname, 'assets/icons/png/logo-blm.png'));
     mainWindow.loadURL(WEBVIEW_URL || `file://${__dirname}/index.html`);
 
     // Build menu AFTER mainWindow is assigned so window reference is valid

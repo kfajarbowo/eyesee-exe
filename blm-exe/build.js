@@ -135,6 +135,14 @@ function build(platform) {
 
 		if (outputFolder) {
 			copyExtraFiles(outputFolder);
+			
+			// Inject custom HEVC ffmpeg.dll into the built app executable folder
+			const hevcDll = path.join(__dirname, 'node_modules', 'electron', 'dist', 'ffmpeg.dll');
+			const targetDll = path.join(outputFolder, 'ffmpeg.dll');
+			if (fs.existsSync(hevcDll)) {
+				fs.copyFileSync(hevcDll, targetDll);
+			}
+			
 			console.log(`\n📦 Output: ${outputFolder}`);
 		} else {
 			console.warn('⚠️  Could not find output folder for extra files.');
@@ -153,6 +161,7 @@ function getPackageArgs(config) {
 		`--arch=${config.arch}`,
 		`--icon=${config.icon}`,
 		`--out=${config.out}`,
+		'--asar',
 		// Ignore release-builds agar EXE lama tidak ikut dikopi ke temp (ENOSPC fix)
 		'--ignore="^/release-builds"',
 		'--ignore="^/node_modules/.bin"',

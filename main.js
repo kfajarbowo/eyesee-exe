@@ -2,9 +2,44 @@
 const { app, Menu, ipcMain, dialog, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
-
 // License system
 const { licenseManager, LicenseStatus } = require('./src/license');
+
+// Media codecs / WebRTC
+app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,WebRtcAllowH265Receive');
+app.commandLine.appendSwitch('force-fieldtrials', 'WebRTC-Video-H26xPacketBuffer/Enabled/');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('ignore-certificate-errors');
+// Allow autoplay for streams
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+app.commandLine.appendSwitch('disable-features', 'AsyncDns');
+
+// Dynamic host-resolver-rules: read hostname from server-config.json
+// then resolve its IP using OS DNS (which reads /etc/hosts & Windows hosts file),
+// and inject the resolved IP so Chromium's internal WebRTC DNS also knows it.
+try {
+    const dns = require('dns');
+    const configPath = path.join(__dirname, 'server-config.json');
+    const rawConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const webviewUrl = rawConfig.webviewUrl || '';
+    if (webviewUrl) {
+        const urlObj = new URL(webviewUrl);
+        const hostname = urlObj.hostname; // e.g. "eyesee.id"
+        // Resolve synchronously-ish using dns at startup
+        dns.lookup(hostname, (err, address) => {
+            if (!err && address) {
+                const rule = `MAP ${hostname} ${address}, MAP ${hostname}. ${address}`;
+                app.commandLine.appendSwitch('host-resolver-rules', rule);
+                console.log(`[DNS] Host resolver rule injected: ${rule}`);
+            } else {
+                console.warn(`[DNS] Could not resolve ${hostname}: ${err ? err.message : 'no address'}. WebRTC may use system DNS.`);
+            }
+        });
+    }
+} catch (e) {
+    console.warn('[DNS] Skipping host-resolver-rules injection:', e.message);
+}
 
 // ============================================================================
 // Configuration
@@ -85,7 +120,7 @@ function createLicenseWindow() {
 		minimizable: false,
 		maximizable: false,
 		fullscreenable: false,
-		icon: path.join(__dirname, 'assets/icons/png/logo-eyesee.png'),
+		icon: path.join(__dirname, 'assets/icons/png/eyesee.png'),
 		show: false,
 		backgroundColor: '#667eea',
 		webPreferences: {
@@ -100,7 +135,7 @@ function createLicenseWindow() {
 	licenseWindow.once('ready-to-show', () => {
 		licenseWindow.show();
 		// DEBUG: Open DevTools to see errors
-		licenseWindow.webContents.openDevTools({ mode: 'detach' });
+		// licenseWindow.webContents.openDevTools({ mode: 'detach' });
 	});
 
 	// Remove menu for license window
@@ -164,12 +199,9 @@ function createMainWindow() {
 	});
 }
 
-/**
- * Initialize the application with license check
- */
+
 async function initializeApp() {
 	try {
-		// Initialize license manager with server URL
 		licenseManager.initialize(LICENSE_SERVER_URL);
 
 		// Validate license (await async call)

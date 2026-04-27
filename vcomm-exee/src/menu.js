@@ -141,7 +141,7 @@ function createMenu(mainWindow) {
                             appName: 'VComm',
                             productName: 'VComm Application',
                             version: app.getVersion() || '1.0.0',
-                            iconPath: path.join(__dirname, '../assets/icons/png/logo-vcomm.png')
+                            iconPath: path.join(__dirname, '../assets/icons/png/icon-vcom.png')
                         });
                     },
                 },

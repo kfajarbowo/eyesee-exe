@@ -88,14 +88,14 @@ class LicenseManager {
             license: null
         };
         
-        // Check if we have local license data
+        // Cek apakah ada license lokal
         if (!licenseStorage.hasLicense()) {
             result.status = LicenseStatus.NOT_ACTIVATED;
             result.message = 'Silakan masukkan license key untuk mengaktifkan aplikasi.';
             return result;
         }
         
-        // Load local data
+        // Load data lokal
         const localData = licenseStorage.loadLicenseData();
         if (!localData) {
             result.status = LicenseStatus.INVALID_KEY;
@@ -107,47 +107,18 @@ class LicenseManager {
         this.licenseData = localData;
         result.license = localData;
         
-        // Validate with server
-        try {
-            const serverResult = await serverClient.validateLicense(result.hardwareId);
-            
-            if (serverResult.offline) {
-                return this.handleOfflineValidation(result);
-            }
-            
-            result.online = true;
-            licenseStorage.saveServerCache(serverResult);
-            
-            if (serverResult.revoked) {
-                result.status = LicenseStatus.REVOKED;
-                result.message = serverResult.reason || 'Lisensi telah dinonaktifkan.';
-                return result;
-            }
-            
-            if (serverResult.valid) {
-                result.status = LicenseStatus.VALID;
-                result.message = 'Lisensi aktif.';
-                return result;
-            }
-            
-            if (!serverResult.activated) {
-                result.status = LicenseStatus.NOT_ACTIVATED;
-                result.message = 'Lisensi tidak ditemukan. Silakan aktivasi ulang.';
-                licenseStorage.clearLicenseData();
-                return result;
-            }
-            
-            result.status = LicenseStatus.INVALID_KEY;
-            result.message = 'Lisensi tidak valid.';
-            return result;
-            
-        } catch (error) {
-            console.error('[License] Server validation error:', error);
-            return this.handleOfflineValidation(result);
-        }
+        // ── LICENSE LOKAL ADA → LANGSUNG VALID, TIDAK PERLU CEK SERVER ──
+        // Server hanya dihubungi saat aktivasi pertama kali.
+        // Setelah aktivasi berhasil, aplikasi bisa dibuka langsung tanpa internet.
+        result.status = LicenseStatus.VALID;
+        result.message = 'Lisensi aktif.';
+        result.online = false;
+        console.log('[License] License found locally — app starting without server check.');
+        return result;
     }
     
     handleOfflineValidation(result) {
+        // Kept for compatibility but no longer called during normal startup.
         const offlineStatus = licenseStorage.checkOfflineStatus(CONFIG.OFFLINE_TOLERANCE_HOURS);
         const cache = licenseStorage.loadServerCache();
         

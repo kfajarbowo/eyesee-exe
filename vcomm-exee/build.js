@@ -7,7 +7,7 @@ const buildConfig = {
 	windows: {
 		target: 'win32',
 		arch: 'ia32',
-		icon: 'assets/icons/win/logo-eyesee.ico',
+		icon: 'assets/icons/win/icon-vcom.png',
 		out: 'release-builds/windows',
 		extra: {
 			VersionString: {
@@ -165,6 +165,7 @@ function getPackageArgs(config) {
 		`--arch=${config.arch}`,
 		`--icon=${config.icon}`,
 		`--out=${config.out}`,
+		'--asar=true',
 		// Ignore release-builds agar EXE lama tidak ikut dikopi ke temp (ENOSPC fix)
 		'--ignore="^/release-builds"',
 		'--ignore="^/node_modules/.bin"',

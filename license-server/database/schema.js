@@ -61,7 +61,6 @@ function initializeDatabase() {
         );
     `);
 
-    // Admin Users Table
     db.exec(`
         CREATE TABLE IF NOT EXISTS admin_users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

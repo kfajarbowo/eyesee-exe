@@ -8,7 +8,7 @@ exports.createBrowserWindow = () => {
 		height: 768,
 		minWidth: 800,
 		minHeight: 600,
-		icon: path.join(__dirname, '../assets/icons/png/logo-eyesee.png'),
+		icon: path.join(__dirname, '../assets/icons/png/eyesee.png'),
 		show: false, // Don't show window until ready
 		backgroundColor: '#fff', // Prevent white flash
 		webPreferences: {

@@ -211,7 +211,7 @@ exports.createTemplate = (name, mainWindow) => {
                             appName: 'EyeSee',
                             productName: 'EyeSee Webview Application',
                             version: app.getVersion() || '1.0.0',
-                            iconPath: path.join(__dirname, '../assets/icons/png/logo-eyesee.png')
+                            iconPath: path.join(__dirname, '../assets/icons/png/eyesee.png')
                         });
                     },
                 },
