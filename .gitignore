@@ -5,3 +5,15 @@ package-lock.json
 *.rar
 *.zip
 *.exe
+
+# Large binaries & archives
+*.tar
+*.tar.gz
+
+# Database files (runtime data)
+license-server/data/*.db
+license-server/data/*.db-shm
+license-server/data/*.db-wal
+
+# Screenshots
+screenshot.png

@@ -1,4 +1,5 @@
 {
     "serverUrl": "http://blm.id:3001",
-    "webviewUrl": "http://eyesee.id:3000"
-}
+    "webviewUrl": "http://eyesee.id:3000/",
+    "siteApiUrl": "http://blm.id:3003/api/v1/apps/eyesee"
+}                                           

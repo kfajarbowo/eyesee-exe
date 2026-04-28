@@ -8,8 +8,17 @@
 			content="script-src 'self' 'unsafe-inline';"
 		/>
 		<style>
-			* { margin: 0; padding: 0; box-sizing: border-box; }
-			html, body { width: 100%; height: 100%; overflow: hidden; }
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+			html,
+			body {
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+			}
 			webview {
 				display: flex;
 				width: 100vw;
@@ -20,52 +29,72 @@
 	</head>
 
 	<body>
-		<!-- Webview: URL dibaca dari server-config.json via IPC -->
+		<!-- Webview: URL dari site selection atau server-config.json via IPC -->
 		<webview id="webview"></webview>
 
 		<!-- Error page jika URL tidak dikonfigurasi -->
-		<div id="error-screen" style="
-			display: none;
-			position: fixed;
-			top: 0; left: 0; right: 0; bottom: 0;
-			background: #f8f9fa;
-			font-family: -apple-system, sans-serif;
-			flex-direction: column;
-			align-items: center;
-			justify-content: center;
-			color: #333;
-			text-align: center;
-			padding: 40px;
-		">
-			<div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
-			<h2 style="margin-bottom: 8px;">URL Belum Dikonfigurasi</h2>
-			<p style="color: #666; max-width: 400px; margin-bottom: 24px;">
-				Tambahkan <code>webviewUrl</code> di file <code>server-config.json</code>
+		<div
+			id="error-screen"
+			style="
+				display: none;
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background: #f8f9fa;
+				font-family: -apple-system, sans-serif;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				color: #333;
+				text-align: center;
+				padding: 40px;
+			"
+		>
+			<div style="font-size: 48px; margin-bottom: 16px">⚠️</div>
+			<h2 style="margin-bottom: 8px">URL Belum Dikonfigurasi</h2>
+			<p style="color: #666; max-width: 400px; margin-bottom: 24px">
+				Tambahkan <code>webviewUrl</code> di file
+				<code>server-config.json</code>
 				yang ada di folder yang sama dengan aplikasi ini.
 			</p>
-			<pre style="background:#eee;padding:16px 24px;border-radius:8px;font-size:13px;text-align:left">{
+			<pre
+				style="
+					background: #eee;
+					padding: 16px 24px;
+					border-radius: 8px;
+					font-size: 13px;
+					text-align: left;
+				"
+			>
+{
   "serverUrl": "http://192.168.x.x:3001",
   "webviewUrl": "http://192.168.x.x:3000"
-}</pre>
+}</pre
+			>
 		</div>
 
 		<script src="assets/js/renderer.js"></script>
 		<script>
-			// Baca URL dari main process (server-config.json) — AMAN via IPC
-			window.electron.getWebviewUrl().then(url => {
-				const webview = document.getElementById('webview');
-				const errorScreen = document.getElementById('error-screen');
+			// Baca URL dari main process (site selection atau server-config.json) — AMAN via IPC
+			window.electron
+				.getWebviewUrl()
+				.then(url => {
+					const webview = document.getElementById('webview');
+					const errorScreen = document.getElementById('error-screen');
 
-				if (url) {
-					webview.src = url;
-					webview.setAttribute('data-home', url);
-				} else {
-					webview.style.display = 'none';
-					errorScreen.style.display = 'flex';
-				}
-			}).catch(err => {
-				console.error('Failed to get webview URL:', err);
-			});
+					if (url) {
+						webview.src = url;
+						webview.setAttribute('data-home', url);
+					} else {
+						webview.style.display = 'none';
+						errorScreen.style.display = 'flex';
+					}
+				})
+				.catch(err => {
+					console.error('Failed to get webview URL:', err);
+				});
 		</script>
 	</body>
 </html>

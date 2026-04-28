@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="id">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Pilih Site</title>
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="script-src 'self' 'unsafe-inline';"
+		/>
+		<link rel="stylesheet" href="assets/css/site-selector.css" />
+	</head>
+	<body>
+		<div class="site-selector-container">
+			<!-- Header -->
+			<div class="site-selector-header">
+				<img
+					src="assets/icons/png/logo-eyesee.png"
+					alt="EyeSee"
+					class="logo"
+					onerror="this.style.display='none'"
+				/>
+				<div class="title" id="app-title">Pilih Site</div>
+				<div class="subtitle" id="app-subtitle">Memuat daftar site...</div>
+			</div>
+
+			<!-- Loading State -->
+			<div id="loading-state" class="loading-state">
+				<div class="loading-spinner"></div>
+				<p>Mengambil daftar site...</p>
+			</div>
+
+			<!-- Error State -->
+			<div id="error-state" class="error-state" style="display: none">
+				<div class="error-icon">&#9888;</div>
+				<div class="error-title">Gagal Memuat Site</div>
+				<div class="error-message" id="error-message">
+					Tidak dapat terhubung ke server.
+				</div>
+				<button class="btn-retry" id="btn-retry">Coba Lagi</button>
+			</div>
+
+			<!-- Site List State -->
+			<div
+				id="site-list-state"
+				style="display: none; width: 100%; flex-direction: column"
+			>
+				<!-- Search -->
+				<div class="search-wrapper">
+					<span class="search-icon">&#128269;</span>
+					<input
+						type="text"
+						id="search-input"
+						placeholder="Cari site..."
+						autocomplete="off"
+					/>
+				</div>
+
+				<!-- Sites Grid -->
+				<div class="sites-grid" id="sites-grid"></div>
+
+				<!-- Footer -->
+				<div class="site-selector-footer">
+					<label class="remember-choice">
+						<input type="checkbox" id="remember-choice" />
+						Ingat pilihan saya
+					</label>
+					<button class="btn-default" id="btn-default">
+						Gunakan URL Default
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<script>
+			(function () {
+				var loadingState = document.getElementById('loading-state');
+				var errorState = document.getElementById('error-state');
+				var siteListState = document.getElementById('site-list-state');
+				var sitesGrid = document.getElementById('sites-grid');
+				var searchInput = document.getElementById('search-input');
+				var rememberChoice = document.getElementById('remember-choice');
+				var btnDefault = document.getElementById('btn-default');
+				var btnRetry = document.getElementById('btn-retry');
+				var appTitle = document.getElementById('app-title');
+				var appSubtitle = document.getElementById('app-subtitle');
+				var errorMessage = document.getElementById('error-message');
+
+				var allSites = [];
+				var siteStatuses = {}; // siteCode -> { online, responseTime }
+
+				async function initialize() {
+					showLoading();
+					try {
+						var result = await window.electron.getSites();
+						if (result && result.sites && result.sites.length > 0) {
+							allSites = result.sites;
+							appTitle.textContent = 'Pilih Site';
+							appSubtitle.textContent =
+								(result.appName || 'EYESEE') +
+								' \u2014 ' +
+								(result.total || result.sites.length) +
+								' site tersedia';
+							renderSites(allSites);
+							showSiteList();
+							// Start status check in background
+							checkSitesStatus();
+						} else {
+							showError('Tidak ada site yang tersedia.');
+						}
+					} catch (error) {
+						console.error('Failed to load sites:', error);
+						showError('Tidak dapat terhubung ke server site.');
+					}
+				}
+
+				async function checkSitesStatus() {
+					try {
+						var statuses = await window.electron.checkSitesStatus();
+						if (statuses && statuses.length > 0) {
+							statuses.forEach(function (s) {
+								siteStatuses[s.siteCode] = s;
+							});
+							// Re-render with status info
+							var query = searchInput.value.toLowerCase().trim();
+							if (!query) {
+								renderSites(allSites);
+							}
+						}
+					} catch (error) {
+						console.error('Failed to check sites status:', error);
+					}
+				}
+
+				function renderSites(sites) {
+					sitesGrid.innerHTML = '';
+
+					if (sites.length === 0) {
+						sitesGrid.innerHTML =
+							'<div class="no-results">Tidak ada site yang cocok</div>';
+						return;
+					}
+
+					// Sort: online first, then offline
+					var sorted = sites.slice().sort(function (a, b) {
+						var aOnline = siteStatuses[a.siteCode]
+							? siteStatuses[a.siteCode].online
+							: null;
+						var bOnline = siteStatuses[b.siteCode]
+							? siteStatuses[b.siteCode].online
+							: null;
+						// null (checking) goes in the middle
+						if (aOnline === true && bOnline !== true) return -1;
+						if (aOnline !== true && bOnline === true) return 1;
+						return 0;
+					});
+
+					sorted.forEach(function (site) {
+						var card = document.createElement('div');
+						card.className = 'site-card';
+						card.dataset.siteCode = site.siteCode;
+
+						var status = siteStatuses[site.siteCode];
+						var isOffline = status && status.online === false;
+
+						if (isOffline) {
+							card.classList.add('offline');
+						}
+
+						var noteHtml = site.note
+							? '<div class="site-note">' + escapeHtml(site.note) + '</div>'
+							: '';
+
+						var statusHtml = '<div class="site-status">';
+						if (status) {
+							if (status.online === true) {
+								statusHtml += '<span class="status-dot online"></span>';
+								statusHtml +=
+									'<span class="status-text online">Online \u2022 ' +
+									status.responseTime +
+									'ms</span>';
+							} else {
+								statusHtml += '<span class="status-dot offline"></span>';
+								statusHtml +=
+									'<span class="status-text offline">Offline</span>';
+							}
+						} else {
+							statusHtml += '<span class="status-dot checking"></span>';
+							statusHtml += '<span class="status-text">Checking...</span>';
+						}
+						statusHtml += '</div>';
+
+						card.innerHTML =
+							'<div class="site-name">' +
+							'<span class="site-icon">&#9670;</span>' +
+							escapeHtml(site.siteName) +
+							'</div>' +
+							'<div class="site-ip">' +
+							escapeHtml(site.ip) +
+							':' +
+							site.port +
+							'</div>' +
+							noteHtml +
+							statusHtml;
+
+						if (!isOffline) {
+							card.addEventListener('click', function () {
+								selectSite(site);
+							});
+						}
+
+						sitesGrid.appendChild(card);
+					});
+				}
+
+				async function selectSite(site) {
+					var cards = document.querySelectorAll('.site-card');
+					for (var i = 0; i < cards.length; i++) {
+						cards[i].style.borderColor = 'var(--border-color)';
+						cards[i].style.opacity = '0.5';
+						cards[i].style.pointerEvents = 'none';
+					}
+					var selected = document.querySelector(
+						'[data-site-code="' + site.siteCode + '"]'
+					);
+					if (selected) {
+						selected.style.borderColor = 'var(--primary-color)';
+						selected.style.opacity = '1';
+					}
+
+					try {
+						var remember = rememberChoice.checked;
+						await window.electron.selectSite(site.siteCode, remember);
+					} catch (error) {
+						console.error('Failed to select site:', error);
+					}
+				}
+
+				searchInput.addEventListener('input', function () {
+					var query = this.value.toLowerCase().trim();
+					if (!query) {
+						renderSites(allSites);
+						return;
+					}
+					var filtered = allSites.filter(function (site) {
+						return (
+							site.siteName.toLowerCase().indexOf(query) !== -1 ||
+							site.siteCode.toLowerCase().indexOf(query) !== -1 ||
+							site.ip.indexOf(query) !== -1 ||
+							(site.note && site.note.toLowerCase().indexOf(query) !== -1)
+						);
+					});
+					renderSites(filtered);
+				});
+
+				btnDefault.addEventListener('click', function () {
+					window.electron.useDefaultUrl().catch(function (error) {
+						console.error('Failed to use default URL:', error);
+					});
+				});
+
+				btnRetry.addEventListener('click', function () {
+					initialize();
+				});
+
+				function showLoading() {
+					loadingState.style.display = 'flex';
+					errorState.style.display = 'none';
+					siteListState.style.display = 'none';
+				}
+
+				function showError(message) {
+					loadingState.style.display = 'none';
+					errorState.style.display = 'block';
+					siteListState.style.display = 'none';
+					errorMessage.textContent = message;
+				}
+
+				function showSiteList() {
+					loadingState.style.display = 'none';
+					errorState.style.display = 'none';
+					siteListState.style.display = 'flex';
+					searchInput.focus();
+				}
+
+				function escapeHtml(text) {
+					var div = document.createElement('div');
+					div.textContent = text;
+					return div.innerHTML;
+				}
+
+				initialize();
+			})();
+		</script>
+	</body>
+</html>

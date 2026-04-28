@@ -4,10 +4,21 @@ const path = require('path');
 const fs = require('fs');
 // License system
 const { licenseManager, LicenseStatus } = require('./src/license');
+// Site selector
+const { siteSelector } = require('./src/site-selector');
+// Persistent storage for site preference
+const Store = require('electron-store');
+const siteStore = new Store({ name: 'site-preferences' });
 
 // Media codecs / WebRTC
-app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,WebRtcAllowH265Receive');
-app.commandLine.appendSwitch('force-fieldtrials', 'WebRTC-Video-H26xPacketBuffer/Enabled/');
+app.commandLine.appendSwitch(
+	'enable-features',
+	'PlatformHEVCDecoderSupport,WebRtcAllowH265Receive'
+);
+app.commandLine.appendSwitch(
+	'force-fieldtrials',
+	'WebRTC-Video-H26xPacketBuffer/Enabled/'
+);
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('ignore-certificate-errors');
@@ -19,26 +30,38 @@ app.commandLine.appendSwitch('disable-features', 'AsyncDns');
 // then resolve its IP using OS DNS (which reads /etc/hosts & Windows hosts file),
 // and inject the resolved IP so Chromium's internal WebRTC DNS also knows it.
 try {
-    const dns = require('dns');
-    const configPath = path.join(__dirname, 'server-config.json');
-    const rawConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    const webviewUrl = rawConfig.webviewUrl || '';
-    if (webviewUrl) {
-        const urlObj = new URL(webviewUrl);
-        const hostname = urlObj.hostname; // e.g. "eyesee.id"
-        // Resolve synchronously-ish using dns at startup
-        dns.lookup(hostname, (err, address) => {
-            if (!err && address) {
-                const rule = `MAP ${hostname} ${address}, MAP ${hostname}. ${address}`;
-                app.commandLine.appendSwitch('host-resolver-rules', rule);
-                console.log(`[DNS] Host resolver rule injected: ${rule}`);
-            } else {
-                console.warn(`[DNS] Could not resolve ${hostname}: ${err ? err.message : 'no address'}. WebRTC may use system DNS.`);
-            }
-        });
-    }
+	const dns = require('dns');
+	const configPath = path.join(__dirname, 'server-config.json');
+	const rawConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+	const webviewUrl = rawConfig.webviewUrl || '';
+	if (webviewUrl) {
+		const urlObj = new URL(webviewUrl);
+		const hostname = urlObj.hostname; // e.g. "eyesee.id"
+
+		// Skip DNS injection for localhost — Chromium resolves it natively
+		if (hostname === 'localhost' || hostname === '127.0.0.1') {
+			console.log(
+				`[DNS] Skipping host-resolver-rules for ${hostname} (local address)`
+			);
+		} else {
+			// Resolve using OS DNS and inject the rule so Chromium's WebRTC DNS also knows it
+			dns.lookup(hostname, (err, address) => {
+				if (!err && address) {
+					const rule = `MAP ${hostname} ${address}, MAP ${hostname}. ${address}`;
+					app.commandLine.appendSwitch('host-resolver-rules', rule);
+					console.log(`[DNS] Host resolver rule injected: ${rule}`);
+				} else {
+					console.warn(
+						`[DNS] Could not resolve ${hostname}: ${
+							err ? err.message : 'no address'
+						}. WebRTC may use system DNS.`
+					);
+				}
+			});
+		}
+	}
 } catch (e) {
-    console.warn('[DNS] Skipping host-resolver-rules injection:', e.message);
+	console.warn('[DNS] Skipping host-resolver-rules injection:', e.message);
 }
 
 // ============================================================================
@@ -47,72 +70,105 @@ try {
 
 // License server URL - priority: Env Var -> Config File -> Default
 function getServerUrl() {
-    // 1. Environment Variable
-    if (process.env.LICENSE_SERVER_URL) {
-        return process.env.LICENSE_SERVER_URL;
-    }
+	// 1. Environment Variable
+	if (process.env.LICENSE_SERVER_URL) {
+		return process.env.LICENSE_SERVER_URL;
+	}
 
-    // 2. Config File (server-config.json)
-    // In production, look next to the executable. In dev, look in project root.
-    const configPath = app.isPackaged 
-        ? path.join(path.dirname(process.execPath), 'server-config.json')
-        : path.join(__dirname, 'server-config.json');
+	// 2. Config File (server-config.json)
+	// In production, look next to the executable. In dev, look in project root.
+	const configPath = app.isPackaged
+		? path.join(path.dirname(process.execPath), 'server-config.json')
+		: path.join(__dirname, 'server-config.json');
 
-    try {
-        if (fs.existsSync(configPath)) {
-            const configData = fs.readFileSync(configPath, 'utf8');
-            const config = JSON.parse(configData);
-            if (config.serverUrl) {
-                console.log('[App] Loaded server URL from config:', config.serverUrl);
-                return config.serverUrl;
-            }
-        }
-    } catch (error) {
-        console.error('[App] Error reading server-config.json:', error);
-    }
+	try {
+		if (fs.existsSync(configPath)) {
+			const configData = fs.readFileSync(configPath, 'utf8');
+			const config = JSON.parse(configData);
+			if (config.serverUrl) {
+				console.log('[App] Loaded server URL from config:', config.serverUrl);
+				return config.serverUrl;
+			}
+		}
+	} catch (error) {
+		console.error('[App] Error reading server-config.json:', error);
+	}
 
-    // 3. Default (Localhost)
-    return 'http://127.0.0.1:3001';
+	// 3. Default (Localhost)
+	return 'http://127.0.0.1:3001';
 }
 
 const LICENSE_SERVER_URL = getServerUrl();
 
 // Webview URL - baca dari server-config.json
 function getWebviewUrl() {
-    if (process.env.WEBVIEW_URL) return process.env.WEBVIEW_URL;
+	if (process.env.WEBVIEW_URL) return process.env.WEBVIEW_URL;
 
-    const configPath = app.isPackaged
-        ? path.join(path.dirname(process.execPath), 'server-config.json')
-        : path.join(__dirname, 'server-config.json');
+	const configPath = app.isPackaged
+		? path.join(path.dirname(process.execPath), 'server-config.json')
+		: path.join(__dirname, 'server-config.json');
 
-    try {
-        if (fs.existsSync(configPath)) {
-            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-            if (config.webviewUrl) {
-                console.log('[App] Loaded webview URL from config:', config.webviewUrl);
-                return config.webviewUrl;
-            }
-        }
-    } catch (e) {
-        console.error('[App] Error reading webview URL from config:', e.message);
-    }
+	try {
+		if (fs.existsSync(configPath)) {
+			const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+			if (config.webviewUrl) {
+				console.log('[App] Loaded webview URL from config:', config.webviewUrl);
+				return config.webviewUrl;
+			}
+		}
+	} catch (e) {
+		console.error('[App] Error reading webview URL from config:', e.message);
+	}
 
-    return null; // null = tampilkan halaman error
+	return null; // null = tampilkan halaman error
 }
 
 const WEBVIEW_URL = getWebviewUrl();
 console.log('[App] Webview URL:', WEBVIEW_URL || '(not configured)');
 
+// Site API URL - for fetching available sites list
+function getSiteApiUrl() {
+	if (process.env.SITE_API_URL) return process.env.SITE_API_URL;
+
+	const configPath = app.isPackaged
+		? path.join(path.dirname(process.execPath), 'server-config.json')
+		: path.join(__dirname, 'server-config.json');
+
+	try {
+		if (fs.existsSync(configPath)) {
+			const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+			if (config.siteApiUrl) {
+				console.log(
+					'[App] Loaded site API URL from config:',
+					config.siteApiUrl
+				);
+				return config.siteApiUrl;
+			}
+		}
+	} catch (e) {
+		console.error('[App] Error reading site API URL from config:', e.message);
+	}
+
+	return null; // No site API configured — use single webviewUrl
+}
+
+const SITE_API_URL = getSiteApiUrl();
+console.log('[App] Site API URL:', SITE_API_URL || '(not configured)');
 
 let mainWindow;
 let licenseWindow;
+let siteSelectorWindow;
+
+// The URL that will be loaded in the main window webview
+// Can come from: site selection, default webviewUrl, or env var
+let selectedWebviewUrl = null;
 
 /**
  * Create the license activation window
  */
 function createLicenseWindow() {
 	const window = require('./src/window');
-	
+
 	licenseWindow = new BrowserWindow({
 		width: 480,
 		height: 600,
@@ -126,12 +182,12 @@ function createLicenseWindow() {
 		webPreferences: {
 			contextIsolation: true,
 			nodeIntegration: false,
-			preload: path.join(__dirname, 'preload.js')
-		}
+			preload: path.join(__dirname, 'preload.js'),
+		},
 	});
 
 	licenseWindow.loadFile('license-dialog.html');
-	
+
 	licenseWindow.once('ready-to-show', () => {
 		licenseWindow.show();
 		// DEBUG: Open DevTools to see errors
@@ -144,6 +200,46 @@ function createLicenseWindow() {
 	licenseWindow.on('closed', () => {
 		licenseWindow = null;
 		// If license window is closed without activation, quit the app
+		if (!mainWindow) {
+			app.quit();
+		}
+	});
+}
+
+/**
+ * Create the site selector window
+ * Shown after license validation when siteApiUrl is configured
+ */
+function createSiteSelectorWindow() {
+	siteSelectorWindow = new BrowserWindow({
+		width: 560,
+		height: 640,
+		resizable: true,
+		minimizable: true,
+		maximizable: false,
+		fullscreenable: false,
+		icon: path.join(__dirname, 'assets/icons/png/eyesee.png'),
+		show: false,
+		backgroundColor: '#667eea',
+		webPreferences: {
+			contextIsolation: true,
+			nodeIntegration: false,
+			preload: path.join(__dirname, 'preload.js'),
+		},
+	});
+
+	siteSelectorWindow.loadFile('site-selector.html');
+
+	siteSelectorWindow.once('ready-to-show', () => {
+		siteSelectorWindow.show();
+	});
+
+	// Remove menu for site selector window
+	siteSelectorWindow.setMenu(null);
+
+	siteSelectorWindow.on('closed', () => {
+		siteSelectorWindow = null;
+		// If site selector is closed without selection, quit the app
 		if (!mainWindow) {
 			app.quit();
 		}
@@ -199,7 +295,6 @@ function createMainWindow() {
 	});
 }
 
-
 async function initializeApp() {
 	try {
 		licenseManager.initialize(LICENSE_SERVER_URL);
@@ -212,23 +307,8 @@ async function initializeApp() {
 		switch (validation.status) {
 			case LicenseStatus.VALID:
 			case LicenseStatus.OFFLINE_VALID:
-				// License valid - start app
-				createMainWindow();
-				
-				// Show offline warning if applicable
-				if (validation.status === LicenseStatus.OFFLINE_VALID) {
-					setTimeout(() => {
-						if (mainWindow) {
-							dialog.showMessageBox(mainWindow, {
-								type: 'warning',
-								title: 'Mode Offline',
-								message: 'Aplikasi berjalan dalam mode offline',
-								detail: validation.message,
-								buttons: ['OK']
-							});
-						}
-					}, 1000);
-				}
+				// License valid — proceed to site selection or main window
+				await proceedAfterLicense(validation);
 				break;
 
 			case LicenseStatus.REVOKED:
@@ -244,7 +324,8 @@ async function initializeApp() {
 				// Offline too long - require server connection
 				dialog.showErrorBox(
 					'Verifikasi Diperlukan',
-					validation.message || 'Hubungkan ke server untuk memverifikasi lisensi.'
+					validation.message ||
+						'Hubungkan ke server untuk memverifikasi lisensi.'
 				);
 				app.quit();
 				break;
@@ -258,8 +339,52 @@ async function initializeApp() {
 		}
 	} catch (error) {
 		console.error('Failed to initialize app:', error);
-		dialog.showErrorBox('Error', 'Gagal menginisialisasi aplikasi. Silakan coba lagi.');
+		dialog.showErrorBox(
+			'Error',
+			'Gagal menginisialisasi aplikasi. Silakan coba lagi.'
+		);
 		app.quit();
+	}
+}
+
+/**
+ * After license is valid, decide whether to show site selector or go directly to main window
+ */
+async function proceedAfterLicense(validation) {
+	// If site API is configured, always show site selector
+	if (SITE_API_URL) {
+		// Always show site selector — user must choose every time
+		// Even if API fetch fails, the selector will show an error/retry state
+		createSiteSelectorWindow();
+		return;
+	}
+
+	// No site API — use default webviewUrl
+	selectedWebviewUrl = WEBVIEW_URL;
+	createMainWindowWithUrl(selectedWebviewUrl, validation);
+}
+
+/**
+ * Create main window with a specific webview URL
+ */
+function createMainWindowWithUrl(url, validation) {
+	// Store the URL so IPC handler can return it
+	selectedWebviewUrl = url;
+	createMainWindow();
+
+	// Show offline warning if applicable
+	if (validation && validation.status === LicenseStatus.OFFLINE_VALID) {
+		setTimeout(() => {
+			if (mainWindow) {
+				dialog.showMessageBox(mainWindow, {
+					type: 'warning',
+					title: 'Mode Offline',
+					message: 'Aplikasi berjalan dalam mode offline',
+					detail: validation.message,
+					buttons: ['OK'],
+				});
+			}
+		}, 1000);
 	}
 }
 
@@ -291,15 +416,17 @@ ipcMain.handle('get-server-url', async () => {
 	return client.getConfig().serverUrl;
 });
 
-// Expose webview URL ke renderer (dibaca dari server-config.json)
+// Expose webview URL ke renderer — returns selected site URL or default
 ipcMain.handle('get-webview-url', async () => {
-	return WEBVIEW_URL;
+	return selectedWebviewUrl || WEBVIEW_URL;
 });
-
 
 // Activate license
 ipcMain.handle('activate-license', async (event, licenseKey) => {
-	console.log('[DEBUG] activate-license called, server URL:', require('./src/license/license-server-client').getConfig().serverUrl);
+	console.log(
+		'[DEBUG] activate-license called, server URL:',
+		require('./src/license/license-server-client').getConfig().serverUrl
+	);
 	const result = await licenseManager.activateLicense(licenseKey);
 	console.log('[DEBUG] activate-license result:', result);
 	return result;
@@ -318,7 +445,7 @@ ipcMain.handle('get-license-reminder', async () => {
 // Show license info dialog (from Help menu) — async-safe
 ipcMain.on('show-license-info', async () => {
 	if (!mainWindow) return;
-	
+
 	try {
 		// getLicenseInfo is async
 		const info = await licenseManager.getLicenseInfo();
@@ -327,35 +454,59 @@ ipcMain.on('show-license-info', async () => {
 		let statusIcon = '';
 		let statusText = '';
 		switch (status) {
-			case 'valid':         statusIcon = '✅'; statusText = 'AKTIF'; break;
-			case 'offline_valid': statusIcon = '🟡'; statusText = 'AKTIF (Offline)'; break;
-			case 'grace_period':  statusIcon = '⚠️'; statusText = 'MASA TENGGANG'; break;
-			case 'expired':       statusIcon = '❌'; statusText = 'EXPIRED'; break;
-			case 'revoked':       statusIcon = '🚫'; statusText = 'DICABUT'; break;
-			case 'not_activated': statusIcon = '🔒'; statusText = 'BELUM AKTIVASI'; break;
-			default:              statusIcon = 'ℹ️'; statusText = String(status).toUpperCase();
+			case 'valid':
+				statusIcon = '✅';
+				statusText = 'AKTIF';
+				break;
+			case 'offline_valid':
+				statusIcon = '🟡';
+				statusText = 'AKTIF (Offline)';
+				break;
+			case 'grace_period':
+				statusIcon = '⚠️';
+				statusText = 'MASA TENGGANG';
+				break;
+			case 'expired':
+				statusIcon = '❌';
+				statusText = 'EXPIRED';
+				break;
+			case 'revoked':
+				statusIcon = '🚫';
+				statusText = 'DICABUT';
+				break;
+			case 'not_activated':
+				statusIcon = '🔒';
+				statusText = 'BELUM AKTIVASI';
+				break;
+			default:
+				statusIcon = 'ℹ️';
+				statusText = String(status).toUpperCase();
 		}
 
-		const licenseKey  = info?.license?.licenseKey  || info?.licenseKey  || '-';
+		const licenseKey = info?.license?.licenseKey || info?.licenseKey || '-';
 		const productCode = info?.license?.productCode || info?.productCode || '-';
-		const hardwareId  = info?.hardwareId || '-';
+		const hardwareId = info?.hardwareId || '-';
 
 		let details = `Status  : ${statusIcon} ${statusText}\n`;
 		details += `Produk  : ${productCode}\n`;
 		details += `\nLicense Key:\n${licenseKey}\n`;
 		details += `\nHardware ID:\n${hardwareId}`;
-		if (info?.message && status !== 'valid') details += `\n\nInfo: ${info.message}`;
-		
+		if (info?.message && status !== 'valid')
+			details += `\n\nInfo: ${info.message}`;
+
 		dialog.showMessageBox(mainWindow, {
-			type: status === 'valid' || status === 'offline_valid' ? 'info' : 'warning',
+			type:
+				status === 'valid' || status === 'offline_valid' ? 'info' : 'warning',
 			title: 'Informasi Lisensi — EyeSee',
 			message: 'EyeSee License',
 			detail: details,
-			buttons: ['OK']
+			buttons: ['OK'],
 		});
-		
 	} catch (error) {
-		dialog.showErrorBox('Error', 'Gagal memuat informasi lisensi: ' + error.message);
+		dialog.showErrorBox(
+			'Error',
+			'Gagal memuat informasi lisensi: ' + error.message
+		);
 	}
 });
 
@@ -364,12 +515,88 @@ ipcMain.handle('deactivate-license', async () => {
 	return licenseManager.deactivateLicense();
 });
 
-// License activated - close license window and open main window
+// License activated - close license window and proceed to site selection
 ipcMain.handle('license-activated', async () => {
 	if (licenseWindow) {
 		licenseWindow.close();
 	}
-	createMainWindow();
+	// Proceed through site selector flow (same as after valid license)
+	await proceedAfterLicense({ status: LicenseStatus.VALID, message: '' });
+	return { success: true };
+});
+
+// ============================================================
+// Site Selector IPC Handlers
+// ============================================================
+
+// Get available sites from API
+ipcMain.handle('get-sites', async () => {
+	try {
+		if (!SITE_API_URL) {
+			return { sites: [], appName: '', total: 0 };
+		}
+		const result = await siteSelector.fetchSites(SITE_API_URL);
+		return result;
+	} catch (error) {
+		console.error('[App] Failed to get sites:', error.message);
+		throw error;
+	}
+});
+
+// Check online/offline status of all sites
+ipcMain.handle('check-sites-status', async () => {
+	try {
+		const statuses = await siteSelector.checkAllSitesStatus(2000);
+		return statuses;
+	} catch (error) {
+		console.error('[App] Failed to check sites status:', error.message);
+		return [];
+	}
+});
+
+// Select a site and open main window
+ipcMain.handle('select-site', async (event, siteCode, remember) => {
+	const site = siteSelector.findSite(siteCode);
+	if (!site) {
+		return { success: false, error: 'Site not found' };
+	}
+
+	selectedWebviewUrl = siteSelector.buildSiteUrl(site);
+	console.log('[App] Site selected:', site.siteName, '→', selectedWebviewUrl);
+
+	// Save preference if remember is checked
+	if (remember) {
+		siteStore.set('rememberSiteChoice', true);
+		siteStore.set('lastSiteCode', siteCode);
+		console.log('[App] Remembered site choice:', siteCode);
+	} else {
+		siteStore.delete('rememberSiteChoice');
+		siteStore.delete('lastSiteCode');
+	}
+
+	// Close site selector and open main window
+	if (siteSelectorWindow) {
+		siteSelectorWindow.close();
+	}
+	createMainWindowWithUrl(selectedWebviewUrl, null);
+
+	return { success: true, url: selectedWebviewUrl };
+});
+
+// Use default URL instead of site selection
+ipcMain.handle('use-default-url', async () => {
+	selectedWebviewUrl = WEBVIEW_URL;
+	console.log('[App] Using default URL:', selectedWebviewUrl);
+
+	// Clear remembered choice
+	siteStore.delete('rememberSiteChoice');
+	siteStore.delete('lastSiteCode');
+
+	if (siteSelectorWindow) {
+		siteSelectorWindow.close();
+	}
+	createMainWindowWithUrl(selectedWebviewUrl, null);
+
 	return { success: true };
 });
 
