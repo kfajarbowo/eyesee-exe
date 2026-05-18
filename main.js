@@ -282,12 +282,9 @@ function createMainWindow() {
 	// Print function (if enabled)
 	require('./src/print');
 
-	// Check for license warnings after window loads
+	// License bypass — skip license warning check
 	mainWindow.webContents.on('did-finish-load', async () => {
-		const warning = await licenseManager.getWarning();
-		if (warning) {
-			mainWindow.webContents.send('license-warning', warning);
-		}
+		// No license warning needed — bypass enabled
 	});
 
 	mainWindow.on('closed', () => {
@@ -297,46 +294,13 @@ function createMainWindow() {
 
 async function initializeApp() {
 	try {
-		licenseManager.initialize(LICENSE_SERVER_URL);
-
-		// Validate license (await async call)
-		const validation = await licenseManager.validateLicense();
-		console.log('[App] License status:', validation.status);
-
-		// Handle based on status
-		switch (validation.status) {
-			case LicenseStatus.VALID:
-			case LicenseStatus.OFFLINE_VALID:
-				// License valid — proceed to site selection or main window
-				await proceedAfterLicense(validation);
-				break;
-
-			case LicenseStatus.REVOKED:
-				// License revoked - show message and exit
-				dialog.showErrorBox(
-					'Lisensi Dinonaktifkan',
-					validation.message || 'Lisensi aplikasi ini telah dinonaktifkan.'
-				);
-				app.quit();
-				break;
-
-			case LicenseStatus.OFFLINE_EXPIRED:
-				// Offline too long - require server connection
-				dialog.showErrorBox(
-					'Verifikasi Diperlukan',
-					validation.message ||
-						'Hubungkan ke server untuk memverifikasi lisensi.'
-				);
-				app.quit();
-				break;
-
-			case LicenseStatus.NOT_ACTIVATED:
-			case LicenseStatus.INVALID_KEY:
-			default:
-				// Need activation
-				createLicenseWindow();
-				break;
-		}
+		// ⚡ LICENSE BYPASS — skip license validation, go directly to app
+		console.log('[App] License bypass enabled — skipping validation');
+		const validation = {
+			status: LicenseStatus.VALID,
+			message: 'License bypassed',
+		};
+		await proceedAfterLicense(validation);
 	} catch (error) {
 		console.error('Failed to initialize app:', error);
 		dialog.showErrorBox(
@@ -432,14 +396,19 @@ ipcMain.handle('activate-license', async (event, licenseKey) => {
 	return result;
 });
 
-// Get license info
+// Get license info — bypassed, returns valid status
 ipcMain.handle('get-license-info', async () => {
-	return licenseManager.getLicenseInfo();
+	return {
+		status: 'valid',
+		message: 'License bypassed',
+		hardwareId: 'BYPASSED',
+		license: { licenseKey: 'BYPASS', productCode: 'EYES' },
+	};
 });
 
-// Get license reminder
+// Get license reminder — bypassed, no reminder
 ipcMain.handle('get-license-reminder', async () => {
-	return licenseManager.getReminder();
+	return null;
 });
 
 // Show license info dialog (from Help menu) — async-safe

@@ -156,6 +156,7 @@ body {
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
     user-select: none;
+    position: relative;
 }
 
 .site-card:hover {
@@ -165,6 +166,16 @@ body {
 
 .site-card:active {
     background: #e9ecef;
+}
+
+.site-card.offline {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.site-card.offline:hover {
+    border-color: var(--border-color);
+    background: var(--bg-secondary);
 }
 
 .site-card .site-name {
@@ -193,6 +204,52 @@ body {
     color: var(--text-secondary);
     margin-top: 4px;
     font-style: italic;
+}
+
+/* Status indicator */
+.site-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    margin-top: 6px;
+}
+
+.site-status .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.site-status .status-dot.online {
+    background: var(--success-color);
+}
+
+.site-status .status-dot.offline {
+    background: var(--error-color);
+}
+
+.site-status .status-dot.checking {
+    background: var(--text-muted);
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+.site-status .status-text {
+    color: var(--text-muted);
+}
+
+.site-status .status-text.online {
+    color: var(--success-color);
+}
+
+.site-status .status-text.offline {
+    color: var(--error-color);
 }
 
 /* No results */

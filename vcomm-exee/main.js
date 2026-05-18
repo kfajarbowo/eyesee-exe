@@ -205,40 +205,13 @@ function createMainWindowWithUrl(url, validation) {
 
 async function initializeApp() {
 	try {
-		licenseManager.initialize(LICENSE_SERVER_URL);
-		const validation = await licenseManager.validateLicense();
-		console.log('[App] License status:', validation.status);
-
-		switch (validation.status) {
-			case LicenseStatus.VALID:
-			case LicenseStatus.OFFLINE_VALID:
-				await proceedAfterLicense(validation);
-				break;
-
-			case LicenseStatus.REVOKED:
-				dialog.showErrorBox(
-					'Lisensi Dinonaktifkan',
-					validation.message || 'Lisensi aplikasi ini telah dinonaktifkan.'
-				);
-				app.quit();
-				break;
-
-			case LicenseStatus.OFFLINE_EXPIRED:
-				dialog.showErrorBox(
-					'Verifikasi Diperlukan',
-					validation.message ||
-						'Hubungkan ke server untuk memverifikasi lisensi.'
-				);
-				app.quit();
-				break;
-
-			case LicenseStatus.NOT_ACTIVATED:
-			case LicenseStatus.INVALID_KEY:
-			case LicenseStatus.HARDWARE_MISMATCH:
-			default:
-				createLicenseWindow(validation.message);
-				break;
-		}
+		// ⚡ LICENSE BYPASS — skip license validation, go directly to app
+		console.log('[App] License bypass enabled — skipping validation');
+		const validation = {
+			status: LicenseStatus.VALID,
+			message: 'License bypassed',
+		};
+		await proceedAfterLicense(validation);
 	} catch (error) {
 		console.error('[App] Initialization failed:', error);
 		dialog.showErrorBox('Error', 'Gagal memulai aplikasi: ' + error.message);
@@ -301,12 +274,19 @@ ipcMain.handle('activate-license', async (event, licenseKey) => {
 	return result;
 });
 
+// Get license info — bypassed, returns valid status
 ipcMain.handle('get-license-info', async () => {
-	return await licenseManager.getLicenseInfo();
+	return {
+		status: 'valid',
+		message: 'License bypassed',
+		hardwareId: 'BYPASSED',
+		license: { licenseKey: 'BYPASS', productCode: 'VCOMM' },
+	};
 });
 
+// Get license warning — bypassed, no warning
 ipcMain.handle('get-license-warning', async () => {
-	return await licenseManager.getWarning();
+	return null;
 });
 
 ipcMain.on('license-activated', async () => {

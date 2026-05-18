@@ -1,5 +1,5 @@
 {
     "serverUrl": "http://blm.id:3001",
     "webviewUrl": "http://bms.id:8502",
-    "siteApiUrl": "https://trizein.vercel.app/api/v1/apps/bms"
+    "siteApiUrl": "http://local.id:3003/api/v1/apps/bms"
 }

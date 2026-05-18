@@ -91,6 +91,15 @@ class SiteSelector {
 	 * @returns {Promise<{siteCode: string, online: boolean, responseTime: number}>}
 	 */
 	checkSiteStatus(site, timeout = 2000) {
+		// Guard: skip sites without valid ip or port
+		if (!site.ip || !site.port) {
+			return Promise.resolve({
+				siteCode: site.siteCode,
+				online: false,
+				responseTime: 0,
+			});
+		}
+
 		return new Promise(resolve => {
 			const net = require('net');
 			const start = Date.now();
@@ -122,7 +131,7 @@ class SiteSelector {
 				});
 			});
 
-			socket.connect(site.port, site.ip);
+			socket.connect(Number(site.port), site.ip);
 		});
 	}
 

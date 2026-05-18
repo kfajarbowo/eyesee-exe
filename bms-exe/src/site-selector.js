@@ -85,6 +85,67 @@ class SiteSelector {
 	}
 
 	/**
+	 * Check if a site's server is reachable via TCP connect
+	 * @param {Object} site - Site object with ip and port
+	 * @param {number} timeout - Timeout in ms (default 2000)
+	 * @returns {Promise<{siteCode: string, online: boolean, responseTime: number}>}
+	 */
+	checkSiteStatus(site, timeout = 2000) {
+		// Guard: skip sites without valid ip or port
+		if (!site.ip || !site.port) {
+			return Promise.resolve({
+				siteCode: site.siteCode,
+				online: false,
+				responseTime: 0,
+			});
+		}
+
+		return new Promise(resolve => {
+			const net = require('net');
+			const start = Date.now();
+
+			const socket = new net.Socket();
+			socket.setTimeout(timeout);
+
+			socket.on('connect', () => {
+				const responseTime = Date.now() - start;
+				socket.destroy();
+				resolve({ siteCode: site.siteCode, online: true, responseTime });
+			});
+
+			socket.on('timeout', () => {
+				socket.destroy();
+				resolve({
+					siteCode: site.siteCode,
+					online: false,
+					responseTime: timeout,
+				});
+			});
+
+			socket.on('error', () => {
+				socket.destroy();
+				resolve({
+					siteCode: site.siteCode,
+					online: false,
+					responseTime: Date.now() - start,
+				});
+			});
+
+			socket.connect(Number(site.port), site.ip);
+		});
+	}
+
+	/**
+	 * Check status of all sites in parallel
+	 * @param {number} timeout - Timeout per site in ms
+	 * @returns {Promise<Array<{siteCode: string, online: boolean, responseTime: number}>>}
+	 */
+	async checkAllSitesStatus(timeout = 2000) {
+		const checks = this.sites.map(site => this.checkSiteStatus(site, timeout));
+		return Promise.all(checks);
+	}
+
+	/**
 	 * HTTP GET request (no external dependencies)
 	 * @param {string} url
 	 * @returns {Promise<string>}

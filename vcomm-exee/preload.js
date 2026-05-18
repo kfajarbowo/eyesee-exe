@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electron', {
 
 	// Site Selector API
 	getSites: () => ipcRenderer.invoke('get-sites'),
+	checkSitesStatus: () => ipcRenderer.invoke('check-sites-status'),
 	selectSite: (siteCode, remember) =>
 		ipcRenderer.invoke('select-site', siteCode, remember),
 	useDefaultUrl: () => ipcRenderer.invoke('use-default-url'),

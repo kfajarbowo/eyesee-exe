@@ -87,6 +87,7 @@
 				const errorMessage = document.getElementById('error-message');
 
 				let allSites = [];
+				var siteStatuses = {}; // siteCode -> { online, responseTime }
 
 				async function initialize() {
 					showLoading();
@@ -96,18 +97,38 @@
 							allSites = result.sites;
 							appTitle.textContent = 'Pilih Site';
 							appSubtitle.textContent =
-								(result.appName || 'EYESEE') +
+								(result.appName || 'VCOMM') +
 								' \u2014 ' +
 								(result.total || result.sites.length) +
 								' site tersedia';
 							renderSites(allSites);
 							showSiteList();
+							// Start status check in background
+							checkSitesStatus();
 						} else {
 							showError('Tidak ada site yang tersedia.');
 						}
 					} catch (error) {
 						console.error('Failed to load sites:', error);
 						showError('Tidak dapat terhubung ke server site.');
+					}
+				}
+
+				async function checkSitesStatus() {
+					try {
+						var statuses = await window.electron.checkSitesStatus();
+						if (statuses && statuses.length > 0) {
+							statuses.forEach(function (s) {
+								siteStatuses[s.siteCode] = s;
+							});
+							// Re-render with status info
+							var query = searchInput.value.toLowerCase().trim();
+							if (!query) {
+								renderSites(allSites);
+							}
+						}
+					} catch (error) {
+						console.error('Failed to check sites status:', error);
 					}
 				}
 
@@ -120,14 +141,54 @@
 						return;
 					}
 
-					sites.forEach(function (site) {
+					// Sort: online first, then offline
+					var sorted = sites.slice().sort(function (a, b) {
+						var aOnline = siteStatuses[a.siteCode]
+							? siteStatuses[a.siteCode].online
+							: null;
+						var bOnline = siteStatuses[b.siteCode]
+							? siteStatuses[b.siteCode].online
+							: null;
+						// null (checking) goes in the middle
+						if (aOnline === true && bOnline !== true) return -1;
+						if (aOnline !== true && bOnline === true) return 1;
+						return 0;
+					});
+
+					sorted.forEach(function (site) {
 						var card = document.createElement('div');
 						card.className = 'site-card';
 						card.dataset.siteCode = site.siteCode;
 
+						var status = siteStatuses[site.siteCode];
+						var isOffline = status && status.online === false;
+
+						if (isOffline) {
+							card.classList.add('offline');
+						}
+
 						var noteHtml = site.note
 							? '<div class="site-note">' + escapeHtml(site.note) + '</div>'
 							: '';
+
+						var statusHtml = '<div class="site-status">';
+						if (status) {
+							if (status.online === true) {
+								statusHtml += '<span class="status-dot online"></span>';
+								statusHtml +=
+									'<span class="status-text online">Online \u2022 ' +
+									status.responseTime +
+									'ms</span>';
+							} else {
+								statusHtml += '<span class="status-dot offline"></span>';
+								statusHtml +=
+									'<span class="status-text offline">Offline</span>';
+							}
+						} else {
+							statusHtml += '<span class="status-dot checking"></span>';
+							statusHtml += '<span class="status-text">Checking...</span>';
+						}
+						statusHtml += '</div>';
 
 						card.innerHTML =
 							'<div class="site-name">' +
@@ -139,11 +200,15 @@
 							':' +
 							site.port +
 							'</div>' +
-							noteHtml;
+							noteHtml +
+							statusHtml;
 
-						card.addEventListener('click', function () {
-							selectSite(site);
-						});
+						if (!isOffline) {
+							card.addEventListener('click', function () {
+								selectSite(site);
+							});
+						}
+
 						sitesGrid.appendChild(card);
 					});
 				}
