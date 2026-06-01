@@ -1,5 +1,38 @@
 {
     "serverUrl": "http://blm.id:3001",
     "webviewUrl": "http://bms.id:8502",
-    "siteApiUrl": "http://local.id:3003/api/v1/apps/bms"
+    "siteApiUrl": "http://blm.id:3003/api/v1/apps/bms",
+    "fallbackApiUrls": [
+        "http://172.27.0.5:3003/api/v1/apps/bms",
+        "http://172.27.0.37:3003/api/v1/apps/bms",
+        "http://172.27.0.69:3003/api/v1/apps/bms",
+        "http://172.27.0.101:3003/api/v1/apps/bms",
+        "http://172.27.0.133:3003/api/v1/apps/bms",
+        "http://172.27.0.165:3003/api/v1/apps/bms",
+        "http://172.27.0.197:3003/api/v1/apps/bms",
+        "http://172.27.0.229:3003/api/v1/apps/bms",
+        "http://172.27.1.5:3003/api/v1/apps/bms",
+        "http://172.27.1.37:3003/api/v1/apps/bms",
+        "http://172.27.1.69:3003/api/v1/apps/bms",
+        "http://172.27.1.101:3003/api/v1/apps/bms",
+        "http://172.27.1.133:3003/api/v1/apps/bms",
+        "http://172.27.1.165:3003/api/v1/apps/bms",
+        "http://172.27.1.197:3003/api/v1/apps/bms",
+        "http://172.27.1.229:3003/api/v1/apps/bms",
+        "http://172.27.2.5:3003/api/v1/apps/bms",
+        "http://172.27.2.37:3003/api/v1/apps/bms",
+        "http://172.27.2.69:3003/api/v1/apps/bms",
+        "http://172.27.2.101:3003/api/v1/apps/bms",
+        "http://172.27.2.133:3003/api/v1/apps/bms",
+        "http://172.27.2.165:3003/api/v1/apps/bms"
+    ],
+    "dnsMap": {
+        "bms.id": 0,
+        "blm.id": 1,
+        "local.id": 1,
+        "eyesee.id": 2,
+        "map.id": -1,
+        "storage.id": 3,
+        "chat.id": 4
+    }
 }

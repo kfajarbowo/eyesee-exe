@@ -26,42 +26,83 @@ app.commandLine.appendSwitch('ignore-certificate-errors');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('disable-features', 'AsyncDns');
 
-// Dynamic host-resolver-rules: read hostname from server-config.json
-// then resolve its IP using OS DNS (which reads /etc/hosts & Windows hosts file),
-// and inject the resolved IP so Chromium's internal WebRTC DNS also knows it.
+// ============================================================================
+// Dynamic DNS Resolution — resolve hostnames to site-specific IPs
+// ============================================================================
+// Problem: Web app uses DNS hostnames (eyesee.id) in .env, but clients
+// without a DNS server (e.g. Starlink) can't resolve them.
+// Solution: Read dnsMap from config + remembered site IP from electron-store,
+// calculate IP for each hostname, inject host-resolver-rules before app.ready.
+//
+// dnsMap format: { "eyesee.id": 0, "blm.id": -1, "chat.id": 2 }
+//   offset is relative to the site's EyeSee IP (from site selector API)
+// ============================================================================
+
+let dnsMap = null;
+let injectedSiteIp = null; // track which site IP was used for DNS rules
+let fallbackApiUrls = [];
+
 try {
-	const dns = require('dns');
 	const configPath = path.join(__dirname, 'server-config.json');
 	const rawConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-	const webviewUrl = rawConfig.webviewUrl || '';
-	if (webviewUrl) {
-		const urlObj = new URL(webviewUrl);
-		const hostname = urlObj.hostname; // e.g. "eyesee.id"
+	dnsMap = rawConfig.dnsMap || null;
+	if (rawConfig.fallbackApiUrls) {
+		fallbackApiUrls = rawConfig.fallbackApiUrls;
+	}
 
-		// Skip DNS injection for localhost — Chromium resolves it natively
-		if (hostname === 'localhost' || hostname === '127.0.0.1') {
-			console.log(
-				`[DNS] Skipping host-resolver-rules for ${hostname} (local address)`
-			);
+	if (dnsMap) {
+		// Only inject rules if we have a remembered site IP.
+		// For first launch (no remembered IP), DNS rules aren't strictly needed
+		// for Chromium yet, because we only need DNS to fetch the site API via Node.js
+		const rememberedIp = siteStore.get('lastSiteIp');
+		if (rememberedIp) {
+			const parts = rememberedIp.split('.').map(Number);
+			const rules = [];
+
+			for (const [hostname, offset] of Object.entries(dnsMap)) {
+				const ip = [...parts];
+				ip[3] = ip[3] + offset;
+				const resolvedIp = ip.join('.');
+				rules.push(`MAP ${hostname} ${resolvedIp}`);
+				rules.push(`MAP ${hostname}. ${resolvedIp}`);
+			}
+
+			const ruleString = rules.join(', ');
+			app.commandLine.appendSwitch('host-resolver-rules', ruleString);
+			injectedSiteIp = rememberedIp;
+			console.log(`[DNS] Injected rules for site IP ${rememberedIp}:`, ruleString);
 		} else {
-			// Resolve using OS DNS and inject the rule so Chromium's WebRTC DNS also knows it
-			dns.lookup(hostname, (err, address) => {
-				if (!err && address) {
-					const rule = `MAP ${hostname} ${address}, MAP ${hostname}. ${address}`;
-					app.commandLine.appendSwitch('host-resolver-rules', rule);
-					console.log(`[DNS] Host resolver rule injected: ${rule}`);
-				} else {
-					console.warn(
-						`[DNS] Could not resolve ${hostname}: ${
-							err ? err.message : 'no address'
-						}. WebRTC may use system DNS.`
-					);
-				}
-			});
+			console.log('[DNS] No remembered site — DNS rules will be injected after first site selection (requires restart)');
 		}
 	}
 } catch (e) {
-	console.warn('[DNS] Skipping host-resolver-rules injection:', e.message);
+	console.warn('[DNS] Failed to setup DNS resolver:', e.message);
+}
+
+/**
+ * Resolve hostnames in a URL using dnsMap + a base IP.
+ */
+function resolveDnsMapUrl(url, baseIp) {
+	if (!dnsMap || !baseIp) return url;
+
+	try {
+		const urlObj = new URL(url);
+		const hostname = urlObj.hostname;
+
+		if (hostname in dnsMap) {
+			const parts = baseIp.split('.').map(Number);
+			const offset = dnsMap[hostname];
+			parts[3] = parts[3] + offset;
+			const resolvedIp = parts.join('.');
+			urlObj.hostname = resolvedIp;
+			console.log(`[DNS] Resolved ${hostname} → ${resolvedIp} for Node.js request`);
+			return urlObj.toString();
+		}
+	} catch (e) {
+		console.warn('[DNS] Failed to resolve URL:', e.message);
+	}
+
+	return url;
 }
 
 // ============================================================================
@@ -315,10 +356,24 @@ async function initializeApp() {
  * After license is valid, decide whether to show site selector or go directly to main window
  */
 async function proceedAfterLicense(validation) {
-	// If site API is configured, always show site selector
+	// If site API is configured, check if we're resuming after a DNS restart
 	if (SITE_API_URL) {
-		// Always show site selector — user must choose every time
-		// Even if API fetch fails, the selector will show an error/retry state
+		// Check if we just restarted for DNS injection — skip site selector
+		if (siteStore.get('pendingDnsRestart')) {
+			siteStore.delete('pendingDnsRestart');
+			const savedIp = siteStore.get('lastSiteIp');
+			const savedPort = siteStore.get('lastSitePort');
+			const savedCode = siteStore.get('lastSiteCode');
+
+			if (savedIp && savedPort) {
+				const url = `http://${savedIp}:${savedPort}`;
+				console.log(`[App] Resuming after DNS restart → ${savedCode} (${url})`);
+				createMainWindowWithUrl(url, validation);
+				return;
+			}
+		}
+
+		// Normal flow — show site selector
 		createSiteSelectorWindow();
 		return;
 	}
@@ -504,8 +559,44 @@ ipcMain.handle('get-sites', async () => {
 		if (!SITE_API_URL) {
 			return { sites: [], appName: '', total: 0 };
 		}
-		const result = await siteSelector.fetchSites(SITE_API_URL);
-		return result;
+		
+		const rememberedIp = siteStore.get('lastSiteIp');
+		
+		if (rememberedIp) {
+			const resolvedApiUrl = resolveDnsMapUrl(SITE_API_URL, rememberedIp);
+			return await siteSelector.fetchSites(resolvedApiUrl);
+		}
+
+		// First launch: try fallback API URLs in PARALLEL
+		if (fallbackApiUrls.length > 0) {
+			console.log(`[DNS] Mencoba ${fallbackApiUrls.length} fallback API URL secara bersamaan...`);
+			
+			const promises = fallbackApiUrls.map(url => {
+				return new Promise(async (resolve, reject) => {
+					try {
+						const result = await siteSelector.fetchSites(url);
+						if (result && result.sites && result.sites.length > 0) {
+							resolve(result);
+						} else {
+							reject(new Error("Data kosong"));
+						}
+					} catch (e) {
+						reject(e);
+					}
+				});
+			});
+
+			try {
+				const firstSuccess = await Promise.any(promises);
+				console.log(`[DNS] Sukses terhubung ke salah satu fallback API!`);
+				return firstSuccess;
+			} catch (e) {
+				throw new Error('Semua fallback API offline atau tidak dapat dihubungi.');
+			}
+		}
+
+		// Jika tidak ada fallback, coba URL asli
+		return await siteSelector.fetchSites(SITE_API_URL);
 	} catch (error) {
 		console.error('[App] Failed to get sites:', error.message);
 		throw error;
@@ -533,6 +624,9 @@ ipcMain.handle('select-site', async (event, siteCode, remember) => {
 	selectedWebviewUrl = siteSelector.buildSiteUrl(site);
 	console.log('[App] Site selected:', site.siteName, '→', selectedWebviewUrl);
 
+	// Check if DNS rules need updating (different site than currently injected)
+	const needsDnsRestart = dnsMap && site.ip !== injectedSiteIp;
+
 	// Save preference if remember is checked
 	if (remember) {
 		siteStore.set('rememberSiteChoice', true);
@@ -543,7 +637,25 @@ ipcMain.handle('select-site', async (event, siteCode, remember) => {
 		siteStore.delete('lastSiteCode');
 	}
 
-	// Close site selector and open main window
+	// Always save site IP + port for DNS injection on next launch
+	siteStore.set('lastSiteIp', site.ip);
+	siteStore.set('lastSitePort', String(site.port));
+	siteStore.set('lastSiteCode', siteCode);
+
+	if (needsDnsRestart) {
+		// DNS rules don't match selected site — must restart to apply new rules
+		console.log(`[DNS] Site IP changed: ${injectedSiteIp || 'none'} → ${site.ip}. Restarting app...`);
+		siteStore.set('pendingDnsRestart', true);
+
+		if (siteSelectorWindow) {
+			siteSelectorWindow.close();
+		}
+		app.relaunch();
+		app.exit(0);
+		return { success: true, url: selectedWebviewUrl, restarting: true };
+	}
+
+	// DNS rules already match — proceed without restart
 	if (siteSelectorWindow) {
 		siteSelectorWindow.close();
 	}

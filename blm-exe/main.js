@@ -22,11 +22,68 @@ const Store = require('electron-store');
 const siteStore = new Store({ name: 'site-preferences' });
 
 // ============================================================================
+// Dynamic DNS Resolution
+// ============================================================================
+const fs = require('fs');
+
+let dnsMap = null;
+let injectedSiteIp = null;
+let fallbackApiUrls = [];
+
+try {
+	const configPath = path.join(__dirname, 'server-config.json');
+	const rawConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+	dnsMap = rawConfig.dnsMap || null;
+	if (rawConfig.fallbackApiUrls) {
+		fallbackApiUrls = rawConfig.fallbackApiUrls;
+	}
+
+	if (dnsMap) {
+		const rememberedIp = siteStore.get('lastSiteIp');
+		if (rememberedIp) {
+			const parts = rememberedIp.split('.').map(Number);
+			const rules = [];
+			for (const [hostname, offset] of Object.entries(dnsMap)) {
+				const ip = [...parts];
+				ip[3] = ip[3] + offset;
+				const resolvedIp = ip.join('.');
+				rules.push(`MAP ${hostname} ${resolvedIp}`);
+				rules.push(`MAP ${hostname}. ${resolvedIp}`);
+			}
+			const ruleString = rules.join(', ');
+			app.commandLine.appendSwitch('host-resolver-rules', ruleString);
+			injectedSiteIp = rememberedIp;
+			console.log(`[DNS] Injected rules for site IP ${rememberedIp}:`, ruleString);
+		} else {
+			console.log('[DNS] No remembered site — DNS rules will be injected after first site selection');
+		}
+	}
+} catch (e) {
+	console.warn('[DNS] Failed to setup DNS resolver:', e.message);
+}
+
+function resolveDnsMapUrl(url, baseIp) {
+	if (!dnsMap || !baseIp) return url;
+	try {
+		const urlObj = new URL(url);
+		if (urlObj.hostname in dnsMap) {
+			const parts = baseIp.split('.').map(Number);
+			parts[3] = parts[3] + dnsMap[urlObj.hostname];
+			urlObj.hostname = parts.join('.');
+			console.log(`[DNS] Resolved ${new URL(url).hostname} → ${urlObj.hostname} for Node.js request`);
+			return urlObj.toString();
+		}
+	} catch (e) {
+		console.warn('[DNS] Failed to resolve URL:', e.message);
+	}
+	return url;
+}
+
+// ============================================================================
 // Configuration
 // ============================================================================
 
 // License server URL - priority: Env Var -> Config File -> Default
-const fs = require('fs');
 
 function getServerUrl() {
 	if (process.env.LICENSE_SERVER_URL) {
@@ -293,8 +350,19 @@ async function initializeApp() {
 
 async function proceedAfterLicense(validation) {
 	if (SITE_API_URL) {
-		// Always show site selector — user must choose every time
-		// Even if API fetch fails, the selector will show an error/retry state
+		// Check if we just restarted for DNS injection — skip site selector
+		if (siteStore.get('pendingDnsRestart')) {
+			siteStore.delete('pendingDnsRestart');
+			const savedIp = siteStore.get('lastSiteIp');
+			const savedPort = siteStore.get('lastSitePort');
+			const savedCode = siteStore.get('lastSiteCode');
+			if (savedIp && savedPort) {
+				const url = `http://${savedIp}:${savedPort}`;
+				console.log(`[App] Resuming after DNS restart → ${savedCode} (${url})`);
+				createMainWindowWithUrl(url, validation);
+				return;
+			}
+		}
 		createSiteSelectorWindow();
 		return;
 	}
@@ -394,11 +462,36 @@ ipcMain.handle(
 
 ipcMain.handle('get-sites', async () => {
 	try {
-		if (!SITE_API_URL) {
-			return { sites: [], appName: '', total: 0 };
+		if (!SITE_API_URL) return { sites: [], appName: '', total: 0 };
+		
+		const rememberedIp = siteStore.get('lastSiteIp');
+		if (rememberedIp) {
+			const resolvedApiUrl = resolveDnsMapUrl(SITE_API_URL, rememberedIp);
+			return await siteSelector.fetchSites(resolvedApiUrl);
 		}
-		const result = await siteSelector.fetchSites(SITE_API_URL);
-		return result;
+
+		if (fallbackApiUrls.length > 0) {
+			console.log(`[DNS] Mencoba ${fallbackApiUrls.length} fallback API URL secara bersamaan...`);
+			const promises = fallbackApiUrls.map(url => {
+				return new Promise(async (resolve, reject) => {
+					try {
+						const result = await siteSelector.fetchSites(url);
+						if (result && result.sites && result.sites.length > 0) resolve(result);
+						else reject(new Error('Kosong'));
+					} catch (e) { reject(e); }
+				});
+			});
+
+			try {
+				const firstSuccess = await Promise.any(promises);
+				console.log(`[DNS] Sukses terhubung ke salah satu fallback API!`);
+				return firstSuccess;
+			} catch (e) {
+				throw new Error('Semua fallback API offline');
+			}
+		}
+
+		return await siteSelector.fetchSites(SITE_API_URL);
 	} catch (error) {
 		console.error('[App] Failed to get sites:', error.message);
 		throw error;
@@ -425,12 +518,27 @@ ipcMain.handle('select-site', async (event, siteCode, remember) => {
 	selectedWebviewUrl = siteSelector.buildSiteUrl(site);
 	console.log('[App] Site selected:', site.siteName, '→', selectedWebviewUrl);
 
+	const needsDnsRestart = dnsMap && site.ip !== injectedSiteIp;
+
 	if (remember) {
 		siteStore.set('rememberSiteChoice', true);
 		siteStore.set('lastSiteCode', siteCode);
 	} else {
 		siteStore.delete('rememberSiteChoice');
 		siteStore.delete('lastSiteCode');
+	}
+
+	siteStore.set('lastSiteIp', site.ip);
+	siteStore.set('lastSitePort', String(site.port));
+	siteStore.set('lastSiteCode', siteCode);
+
+	if (needsDnsRestart) {
+		console.log(`[DNS] Site IP changed: ${injectedSiteIp || 'none'} → ${site.ip}. Restarting...`);
+		siteStore.set('pendingDnsRestart', true);
+		if (siteSelectorWindow) { siteSelectorWindow.close(); }
+		app.relaunch();
+		app.exit(0);
+		return { success: true, url: selectedWebviewUrl, restarting: true };
 	}
 
 	if (siteSelectorWindow) {
