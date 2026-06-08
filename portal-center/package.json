@@ -1,0 +1,22 @@
+{
+  "name": "portal-center",
+  "productName": "Portal Center",
+  "version": "1.0.0",
+  "description": "Command Center Portal — Manage all sites and applications",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "node build.js",
+    "package-win": "npx electron-packager . --overwrite --asar --platform=win32 --arch=x64 --icon=assets/icons/win/icon.ico --prune=true --out=release-builds --version-string.CompanyName=CE --version-string.FileDescription=CE --version-string.ProductName=\"Portal Center\""
+  },
+  "keywords": ["Electron", "portal", "command-center"],
+  "author": "CE",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-packager": "^17.1.1"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  }
+}

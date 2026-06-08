@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Portal Center</title>
+	<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;" />
+	<link rel="stylesheet" href="assets/css/portal.css" />
+</head>
+<body>
+
+<!-- Radar Background -->
+<div class="radar-bg">
+	<div class="radar-line"></div>
+</div>
+
+<div class="app-container">
+	<!-- Header -->
+	<header class="header">
+		<!-- Top Row: Logo & Org -->
+		<div class="header-top">
+			<div class="header-logo">
+				<div class="logo-bars">
+					<div class="logo-bar"></div>
+					<div class="logo-bar"></div>
+					<div class="logo-bar"></div>
+				</div>
+				<span class="logo-text">PORTAL</span>
+			</div>
+			<div class="header-right">
+				<div class="header-org">
+					<div class="org-name" id="org-name">Markas Besar</div>
+					<div class="org-sub" id="org-sub">Command Center</div>
+				</div>
+				<div class="org-icon">
+					<svg viewBox="0 0 24 24" fill="currentColor">
+						<path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"/>
+					</svg>
+				</div>
+				<div class="window-controls">
+					<button class="titlebar-btn" onclick="window.portal.minimizeWindow()">&#x2500;</button>
+					<button class="titlebar-btn" onclick="window.portal.maximizeWindow()">&#x25A1;</button>
+					<button class="titlebar-btn close" onclick="window.portal.closeWindow()">&#x2715;</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Bottom Row: Nav Tabs -->
+		<div class="header-tabs">
+			<div class="header-tabs-line"></div>
+			<div class="slanted-divider slanted-left">
+				<div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div>
+				<div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div>
+			</div>
+			<div class="slanted-divider slanted-right">
+				<div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div>
+				<div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div>
+			</div>
+			<nav class="nav-tabs">
+				<button class="app-tab active" data-app="eyesee">Eyesee</button>
+				<button class="app-tab" data-app="bms">BMS</button>
+				<button class="app-tab" data-app="blm">BLM</button>
+				<button class="app-tab" data-app="chat">VCOM</button>
+			</nav>
+		</div>
+	</header>
+
+	<!-- Body -->
+	<div class="body-layout">
+		<!-- Sidebar -->
+		<aside class="sidebar">
+			<div class="sidebar-buttons">
+				<button class="sidebar-btn" id="btn-add-pos"><span class="plus">+</span> Add Pos</button>
+				<button class="sidebar-btn" id="btn-add-region"><span class="plus">+</span> Wilayah</button>
+			</div>
+			<div class="sidebar-search">
+				<span class="search-icon">
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"/>
+					</svg>
+				</span>
+				<input type="text" id="search-region" placeholder="Search Wilayah" autocomplete="off" />
+			</div>
+			<ul class="region-list custom-scrollbar" id="region-list"></ul>
+		</aside>
+
+		<!-- Content Area -->
+		<div class="content-area">
+			<div class="content-header">
+				<div class="content-title" id="content-title">Memuat...</div>
+				<div class="content-count" id="content-count"></div>
+			</div>
+
+			<!-- Loading -->
+			<div class="loading-state" id="loading-state">
+				<div class="spinner"></div>
+				<div class="loading-text">Mengambil data dari server...</div>
+			</div>
+
+			<!-- Empty -->
+			<div class="empty-state" id="empty-state" style="display:none">
+				<div class="empty-icon">&#128752;</div>
+				<div class="empty-title">Belum Ada Data</div>
+				<div class="empty-desc">Mulai dengan menambahkan Wilayah dan Pos untuk memantau semua site dari Command Center.</div>
+				<button class="btn btn-primary" onclick="openModal('region')"><span class="btn-icon">+</span> Tambah Wilayah</button>
+			</div>
+
+			<!-- Grid -->
+			<div class="pos-grid custom-scrollbar" id="pos-grid" style="display:none"></div>
+		</div>
+	</div>
+
+	<!-- Footer -->
+	<footer class="footer">
+		<div class="footer-left">
+			<div class="footer-dots">
+				<div class="footer-dot d1"></div>
+				<div class="footer-dot d2"></div>
+				<div class="footer-dot d3"></div>
+				<div class="footer-dot d2"></div>
+				<div class="footer-dot d1"></div>
+			</div>
+			<span class="status-text" id="toolbar-status">System Status: <span class="optimal">Optimal</span></span>
+		</div>
+		<div class="footer-right">
+			<div class="footer-sq d1"></div>
+			<div class="footer-sq d1"></div>
+			<div class="footer-sq d1"></div>
+			<div class="footer-sq d2"></div>
+			<div class="footer-sq d2"></div>
+			<div class="footer-sq d3"></div>
+		</div>
+	</footer>
+</div>
+
+<!-- Modal: Add/Edit Region -->
+<div class="modal-overlay" id="modal-region">
+	<div class="modal">
+		<div class="modal-header">
+			<div class="modal-title" id="modal-region-title">Tambah Wilayah</div>
+			<button class="modal-close" onclick="closeModal('region')">&times;</button>
+		</div>
+		<div class="modal-body">
+			<input type="hidden" id="region-edit-code" />
+			<div class="form-group">
+				<label>Kode Wilayah</label>
+				<input type="text" id="region-code" placeholder="e.g. PAPUA" />
+				<div class="form-hint">Huruf kapital, tanpa spasi</div>
+			</div>
+			<div class="form-group">
+				<label>Nama Wilayah</label>
+				<input type="text" id="region-name" placeholder="e.g. Papua" />
+			</div>
+			<div class="form-group">
+				<label>Deskripsi (opsional)</label>
+				<textarea id="region-desc" placeholder="Deskripsi wilayah..."></textarea>
+			</div>
+		</div>
+		<div class="modal-footer">
+			<button class="btn btn-secondary" onclick="closeModal('region')">Batal</button>
+			<button class="btn btn-primary" id="btn-save-region">Simpan</button>
+		</div>
+	</div>
+</div>
+
+<!-- Modal: Add/Edit Pos -->
+<div class="modal-overlay" id="modal-pos">
+	<div class="modal">
+		<div class="modal-header">
+			<div class="modal-title" id="modal-pos-title">Tambah Pos</div>
+			<button class="modal-close" onclick="closeModal('pos')">&times;</button>
+		</div>
+		<div class="modal-body">
+			<input type="hidden" id="pos-edit-code" />
+			<div class="form-group">
+				<label>Kode Site</label>
+				<input type="text" id="pos-code" placeholder="e.g. SITE-23" />
+				<div class="form-hint">Format: SITE-XX</div>
+			</div>
+			<div class="form-group">
+				<label>Nama Pos</label>
+				<input type="text" id="pos-name" placeholder="e.g. Pos Bayangan" />
+			</div>
+			<div class="form-group">
+				<label>Block IP</label>
+				<input type="text" id="pos-blockip" placeholder="e.g. 172.27.3.0/27" />
+			</div>
+			<div class="form-group">
+				<label>Wilayah</label>
+				<select id="pos-region"><option value="">— Pilih Wilayah —</option></select>
+			</div>
+			<div class="form-group">
+				<label>Deskripsi (opsional)</label>
+				<textarea id="pos-desc" placeholder="Deskripsi pos..."></textarea>
+			</div>
+		</div>
+		<div class="modal-footer">
+			<button class="btn btn-secondary" onclick="closeModal('pos')">Batal</button>
+			<button class="btn btn-primary" id="btn-save-pos">Simpan</button>
+		</div>
+	</div>
+</div>
+
+<!-- Modal: Delete Confirm -->
+<div class="modal-overlay" id="modal-delete">
+	<div class="modal">
+		<div class="modal-header">
+			<div class="modal-title">Konfirmasi Hapus</div>
+			<button class="modal-close" onclick="closeModal('delete')">&times;</button>
+		</div>
+		<div class="modal-body">
+			<p id="delete-message" style="font-size:14px;line-height:1.6;color:var(--on-surface-variant)"></p>
+		</div>
+		<div class="modal-footer">
+			<button class="btn btn-secondary" onclick="closeModal('delete')">Batal</button>
+			<button class="btn btn-danger" id="btn-confirm-delete">Hapus</button>
+		</div>
+	</div>
+</div>
+
+<!-- Context Menu -->
+<div class="context-menu" id="context-menu">
+	<div class="context-item" id="ctx-edit">&#9998; Edit</div>
+	<div class="context-divider"></div>
+	<div class="context-item danger" id="ctx-delete">&#128465; Hapus</div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="assets/js/app.js"></script>
+</body>
+</html>

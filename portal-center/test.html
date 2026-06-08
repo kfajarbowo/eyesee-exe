@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Portal - Cyber Command Dashboard</title>
+<!-- Tailwind CSS v3 CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Hanken Grotesk, Inter, Geist -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;700;900&amp;family=Inter:wght@400&amp;family=Geist:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "inverse-primary": "#006875",
+            "on-background": "#d6e5e9",
+            "on-surface": "#d6e5e9",
+            "on-error": "#690005",
+            "on-tertiary": "#690003",
+            "tertiary-container": "#ffc2ba",
+            "surface": "#071518",
+            "surface-bright": "#2e3b3f",
+            "inverse-surface": "#d6e5e9",
+            "surface-container-lowest": "#031013",
+            "on-surface-variant": "#bac9cc",
+            "outline-variant": "#3b494c",
+            "on-secondary": "#0e3639",
+            "tertiary": "#ffe8e4",
+            "inverse-on-surface": "#253336",
+            "primary-fixed": "#9cf0ff",
+            "tertiary-fixed-dim": "#ffb4aa",
+            "surface-container": "#142225",
+            "on-primary-fixed": "#001f24",
+            "secondary-fixed-dim": "#a7cdd1",
+            "on-primary-container": "#00626e",
+            "background": "#071518",
+            "primary-fixed-dim": "#00daf3",
+            "surface-tint": "#00daf3",
+            "surface-container-low": "#101e21",
+            "secondary-fixed": "#c3eaed",
+            "on-primary": "#00363d",
+            "on-secondary-container": "#96bcbf",
+            "primary": "#00daf3",
+            "error-container": "#93000a",
+            "tertiary-fixed": "#ffdad5",
+            "surface-container-high": "#1e2c2f",
+            "secondary": "#a7cdd1",
+            "on-secondary-fixed-variant": "#274c4f",
+            "on-tertiary-fixed-variant": "#930005",
+            "on-secondary-fixed": "#002022",
+            "surface-container-highest": "#29373a",
+            "on-error-container": "#ffdad6",
+            "on-tertiary-fixed": "#410001",
+            "primary-container": "#00e5ff",
+            "surface-dim": "#071518",
+            "error": "#ffb4ab",
+            "surface-variant": "#29373a",
+            "outline": "#849396",
+            "on-primary-fixed-variant": "#004f58",
+            "secondary-container": "#274c4f"
+          },
+          fontFamily: {
+            "headline": ["Hanken Grotesk", "sans-serif"],
+            "body": ["Inter", "sans-serif"],
+            "status": ["Geist", "sans-serif"]
+          },
+          boxShadow: {
+            'glow-cyan': '0 0 15px rgba(0, 218, 243, 0.3)',
+            'tab-glow': '0 -10px 20px -5px rgba(0, 218, 243, 0.4)',
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      background-color: #071518;
+      color: #d6e5e9;
+      overflow: hidden;
+      background-image: radial-gradient(circle at 50% 50%, rgba(0, 218, 243, 0.05) 0%, transparent 70%);
+    }
+
+    /* Radial Radar Background matching ref image */
+    .radar-bg {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1400px;
+      height: 1400px;
+      background: 
+        repeating-radial-gradient(circle at center, transparent 0, transparent 150px, rgba(0, 218, 243, 0.04) 151px, transparent 152px),
+        repeating-radial-gradient(circle at center, transparent 0, transparent 300px, rgba(0, 218, 243, 0.04) 301px, transparent 302px),
+        repeating-radial-gradient(circle at center, transparent 0, transparent 450px, rgba(0, 218, 243, 0.04) 451px, transparent 452px),
+        repeating-radial-gradient(circle at center, transparent 0, transparent 600px, rgba(0, 218, 243, 0.04) 601px, transparent 602px);
+      pointer-events: none;
+      z-index: -1;
+      opacity: 0.8;
+    }
+    
+    .radar-line {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 700px;
+        height: 2px;
+        background: linear-gradient(90deg, rgba(0, 218, 243, 0.15), transparent);
+        transform-origin: left center;
+        animation: radar-sweep 12s linear infinite;
+    }
+
+    @keyframes radar-sweep {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .nav-tab-active {
+      background: linear-gradient(to top, rgba(0, 218, 243, 0.3) 0%, transparent 70%);
+      position: relative;
+    }
+    .nav-tab-active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 10%;
+        right: 10%;
+        height: 3px;
+        background: #00daf3;
+        box-shadow: 0 0 10px #00daf3;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(0, 218, 243, 0.2);
+      border-radius: 10px;
+    }
+    
+    /* Decorative slanted elements */
+    .slanted-divider {
+        display: flex;
+        gap: 4px;
+        opacity: 0.3;
+    }
+    .slanted-bar {
+        width: 3px;
+        height: 16px;
+        background-color: #d6e5e9;
+        transform: skewX(-25deg);
+    }
+  </style>
+</head>
+<body class="font-body antialiased min-h-screen flex flex-col h-screen">
+<div class="radar-bg">
+<div class="radar-line"></div>
+</div>
+<!-- BEGIN: TopNavBar -->
+<header class="h-32 w-full flex flex-col fixed top-0 z-50">
+<!-- Top Row: Logo & User -->
+<div class="flex-1 flex items-center justify-between px-12 pt-4">
+<!-- Logo -->
+<div class="flex items-center gap-4">
+<div class="flex gap-1">
+<div class="w-1.5 h-4 bg-red-600 skew-x-[-20deg]"></div>
+<div class="w-1.5 h-4 bg-red-600 skew-x-[-20deg]"></div>
+<div class="w-1.5 h-4 bg-red-600 skew-x-[-20deg]"></div>
+</div>
+<span class="text-xl font-headline font-black tracking-[0.2em] text-white uppercase italic">PORTAL</span>
+</div>
+<!-- User Profile (Aligned as per Image 2) -->
+<div class="flex items-center gap-4">
+<div class="text-right">
+<div class="text-white font-headline font-bold text-lg leading-tight uppercase tracking-wide">Markas Besar</div>
+<div class="text-on-surface-variant text-[10px] uppercase tracking-widest font-status">Lorem Ipsum</div>
+</div>
+<div class="relative flex items-center justify-center">
+<!-- Eagle Icon from Ref Image 2 -->
+<div class="w-12 h-12 flex items-center justify-center">
+<svg class="w-10 h-10 text-yellow-500" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"></path>
+</svg>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Row: Navigation Tabs sitting on the divider -->
+<div class="h-14 w-full flex items-end justify-center px-12 relative">
+<!-- Horizontal Divider -->
+<div class="absolute bottom-0 left-0 right-0 h-[1px] bg-outline-variant/30"></div>
+<!-- Decorative bits on line -->
+<div class="absolute bottom-1 left-12 slanted-divider">
+<div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div>
+</div>
+<div class="absolute bottom-1 right-12 slanted-divider">
+<div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div><div class="slanted-bar"></div>
+</div>
+<nav class="flex items-center gap-12 z-10">
+<a class="h-10 px-8 flex items-center text-primary nav-tab-active font-headline font-bold uppercase tracking-[0.15em] text-sm" href="#">Eyesee</a>
+<a class="h-10 px-8 flex items-center text-on-surface-variant/60 font-headline font-medium hover:text-white transition-colors uppercase tracking-[0.15em] text-sm" href="#">BMS</a>
+<a class="h-10 px-8 flex items-center text-on-surface-variant/60 font-headline font-medium hover:text-white transition-colors uppercase tracking-[0.15em] text-sm" href="#">BLM</a>
+<a class="h-10 px-8 flex items-center text-on-surface-variant/60 font-headline font-medium hover:text-white transition-colors uppercase tracking-[0.15em] text-sm" href="#">VCOM</a>
+</nav>
+</div>
+</header>
+<!-- END: TopNavBar -->
+<div class="flex flex-1 pt-32 overflow-hidden">
+<!-- BEGIN: SideNavBar -->
+<aside class="w-80 flex flex-col h-full z-40 px-10 pt-8">
+<!-- Top Buttons Row -->
+<div class="flex gap-3 mb-8">
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-surface-container-lowest border border-outline-variant hover:border-primary/50 transition-all text-[10px] font-bold rounded shadow-sm text-white uppercase tracking-wider group">
+<span class="text-primary">+</span> Add Pos
+            </button>
+<button class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-surface-container-lowest border border-outline-variant hover:border-primary/50 transition-all text-[10px] font-bold rounded shadow-sm text-white uppercase tracking-wider group">
+<span class="text-primary">+</span> Wilayah
+            </button>
+</div>
+<!-- Search Bar -->
+<div class="relative mb-8">
+<span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+<svg class="w-4 h-4 text-primary/40" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path></svg>
+</span>
+<input class="block w-full pl-10 pr-4 py-2.5 bg-primary/5 border border-outline-variant/40 rounded-md text-xs text-white placeholder-primary/20 focus:outline-none focus:border-primary/50 transition-all" placeholder="Search Wilayah" type="text"/>
+</div>
+<!-- Regions List -->
+<nav class="space-y-4 custom-scrollbar overflow-y-auto pr-2">
+<a class="block px-4 py-2 text-primary font-headline font-black text-lg bg-primary/5 border-l-4 border-primary rounded-r" href="#">Wilayah 1</a>
+<a class="block px-4 py-1.5 text-on-surface-variant font-medium hover:text-white transition-colors" href="#">Wilayah 2</a>
+<a class="block px-4 py-1.5 text-on-surface-variant font-medium hover:text-white transition-colors" href="#">Wilayah 3</a>
+<a class="block px-4 py-1.5 text-on-surface-variant font-medium hover:text-white transition-colors" href="#">Wilayah 4</a>
+<a class="block px-4 py-1.5 text-on-surface-variant font-medium hover:text-white transition-colors" href="#">Wilayah 5</a>
+<a class="block px-4 py-1.5 text-on-surface-variant font-medium hover:text-white transition-colors" href="#">Wilayah 6</a>
+<a class="block px-4 py-1.5 text-on-surface-variant font-medium hover:text-white transition-colors" href="#">Wilayah 7</a>
+<a class="block px-4 py-1.5 text-on-surface-variant font-medium hover:text-white transition-colors" href="#">Wilayah 8</a>
+</nav>
+</aside>
+<!-- END: SideNavBar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 pt-8 pb-4 pr-12 overflow-y-auto custom-scrollbar">
+<!-- Surveillance Grid -->
+<div class="grid grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-9 gap-x-6 gap-y-12">
+<!-- Row 1 -->
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 group-hover:shadow-glow-cyan transition-all">
+<img alt="Pos Bayangan" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-0mLxoPi2OT9CnXQPaXUvkN7T-6-5Ks6EIuJmiWMy_MBiCBxY3rEUxZQK1-sa--KdTrtEtqNusR4HXYepgc4Q3M5AO2DquUV3EgYuCdztGN0RdAi8RLTSC6828fbxzuJ-x5iRrAIUB3YPaFD_lPdmIXH0hdxeYApBgTdiDrtsNccJ8ChQ70j3JiUPKuFD8YWCEmcLMYF2N6STknlu9wcY0fBSIAJ4DFsFIWcyalzWOESZBAXudWMSZcrmx75GJdYyTdfmp0RVcTw"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight group-hover:text-white">Pos<br/>Bayangan</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Garuda" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuZy6AZ_fPJ8yhYFJ7AocJfPt_fYu1WILtwwvvR89iszZlc19UeuHTqx-3Zxfcpx9RB2WOuy9QYeoR86lXnVZo7QK_Y36Vtq8RWg-TDI6ALR3GcrpqwQe5RQjxF5KRWcbZxo9eQ0Ai4tpEGOeDKw2yTrNCx35q95VRI_X5mbqWHBnmRVVndYAv4WfFVPt2M6ZupKQmWcB9gUmCexMe8bvPXvxycAm8NZx-h0b7bJ7Sfe8WsL6EkYKIt_kkIK3NhGMUHCBoEQ0VgnbU"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Garuda</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Guntur" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJ7-R5oc6mJLH47y6StpbGTgUtYf3Y26_SWwe-Mlo8ejJ3xLKB5f2M9R4vy6UFWg_-XwTrxS3RZzNHWjpfvOinUrLYrPHj56tyOJZhx-tdVlP11UDakRa_74aa79c0pf0yl0dBBaZ_KWmGi1VbsudDUDz530mNuG66qq-3QVGbbotAvt5r5YCcEosekGq64KlLAIepUaeMBpRQzmw5IL_ZUk8HgkMoyegI91qi5QxM7eEXFy9ImEpSsFfrofi409C5A58YuTVoycs"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Guntur</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Delta" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAf14pbINQGu9_iIiWYCerJ-3esvgEJugGGstFi4ksMNWADH8ltPhp_TI61epjItWjLCfiwTv7m5XcS_bjvn_Pnyrl7Eu-zkHeDz_oJYjfcyHfPfkWrJcM2Qi30edg1GSrWT8iOAOjT2By1Sp9myFUT7GVCNIHXWUEiLh0QGc8k8VfZu-j70N-0gIdWm3tp0N2q5DIeFA72XvuzX8_Aby78qXZf-F2u8fLPg1ATYEsvHNKOS_XEminaqZ1JoTM5W40iWg3gEUakBas"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Delta</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Falcon" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCH1BWAXqiDzusMHjVfOD750LAKG3BcqhdlsFbOP7tpET8fKZEe1mmVj6v6wXiLLEoRhbBPJiuEJMMxl53yhBODjEv_F8IJp-KBW3KjIDU9Xbn2Bnn3FC9J-AuRqwK9YQew4UbUGNPea2Zwsl259RQfpTh8fH-0dxNzMk27gFaITxKk4bKHgruS1cBzKCT3Z9wREcechxUsxcelvf0JqusuEMriRqO9mVIsNt38oZLIDmq8EAbSRj8eHtoV-bGjfkG67CCmi_p2hNo"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Falcon</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Bayangan" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBG-BrUzxV7Cge9niI0AxwkXDiAWyk9ZBR4SQArIb6E5WtPKmwTph62x3YMYgwJwRe3lTT6zfUiUFDcb7fg2iWdIS-rqRStSYs0zS7twZCKTk2_9Eey9ajalijfmUc7qqsABHxwVyg0zlY7rgGzLU9nyYyFjvaxF9S3bfJOQDUheA1uO-QwmXNkQFxhgDtnhCCAR6AoiH31TnDlxl1lBfElev3Pn9MqgV7ilV_Zd3HzbUQq_NFiC5kHWPMVp7PTt4h0k2PJDGF6-1Q"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Bayangan</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Garuda" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbUapHR8TLIAhQDhebqhorb9UYPS4dUluISi5GBiL77MwQpRNQBnzQBKsg66WpIKpUZ7kbcEaEXEtI7D3uZkZBicQ37WUuVO83-WrHZUAV0sjTDTs5UZVQnRlpIAUEK_J0gqsMS9c6mmRkjSZsr59NM07Iqp4HWZ73xcbZkO8KJM8cOld2GZyhdaZ-UcM1NOjJNpAC565Qb8njfVxbOYcRPh6tmwj5uN9lpXL3BE1f90SDVqqgaumZjJ8Al-cieMj-xwZtGqgeVKo"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Garuda</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Guntur" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmgQ9wqYdHyW8jRpnEFdJS63sGJAU1-wAU6ylEPSTC6sXvW9cGSwH5VH7AqzX9s7xHqyZHLZ1jIecShkL9I1MKqgXLeWWVby8Xw33JjFq_KUGSdfhz8SKnkZ5qSFdxMbA9Z_iH8rZuD0NuxMRSyfKXwm6ccGduxHPYShTQ32xbxcEpnjNU6dPvcftNUcH9KFe_G-KVNy3kNpMP0ud2SMN2nifavrvNHSyTrLqkGZpTn18ZzFQdZNw7kiXC0lx2Kqt0Rl0D-LtTBys"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Guntur</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Delta" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQ3Lc9snTsTFe71xP1G_-XVlqT_SxS2kbiB3c052EO6jEArcjqDDvdwwPqsNojAIpk2TlNJ1GYcQp7C5RPpf2IunOMUlXKI0Dy1yDnUIQqAWvZ4nqH0VwoL6t9MHnbrT6bEAK5Xfa041-K-6urnNjADIvRJpuoPPWrAkZ87q-u5PPxfuYIehwOoBOaOZqwXue5Z4Hkqdf1KTv8tNxVGuXWpr49OxhXEwwmkS_Cp3mWID3r42JhsaERE2zuRYy3C7H0FMnjjU41VbI"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Delta</div>
+</div>
+<!-- Row 2 (Repeated items to populate) -->
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Bayangan" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdc2Q1XeOc0N6wzJRxnCLAdosOi5-5N4nMxAlpMAKrgmfegoZ1M-Ysyz2hRhLvKwDAu5kVfIypZqxS8lhBa_URyYd4jchUmfOuxXAfAsxR9jH_epMjsd3rdAHAY_07y4-B3IS63khY0KRuofljnCsTHrWeUc7vvFkAGPmK_m5vJ4rnsMyaY-1hlNWHTGd2V7oKTLR1GT4sTFti9Ulw6-AtRfyu7MUnYgBp3tjUCX2jUmhadq7Gg8oaJ27wiJPasjM234or_OOPp9s"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Bayangan</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Garuda" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKv8U4WSrB2SOd0JKgnP6GcfkkOU2dX9PE-zZzE2W7thJ1_5GvLAh7cMT5DvCiJf18M37bPDhhxkrTzfQMNUR-173rKPqB1KySiLvd87c2xZXZ1V9-d4HuKTmkNzR6B-TjD5WLz4ZkRsmcvEiKLL7Ih8aD_aLlPzEl6xkvWfRZM6zbfRQdHXOjLo0OvZmmm8gul7NH6O_wKL5bhY-J78efEpjPCUK8wNK6iwwN8UKwCOQ54h0l8EhKJUGMNBLqxJ-wKmETKUeaX20"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Garuda</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Guntur" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxjkVc8uxpxYCF2iw5S5TigTSIVZvfyKkWky0o88aHcSEp6lhzaZi1R6V-8th1iLRsbvKsPQYgZSmuPJB5l2OpB01LPcPtaYIIC4thb5KuTBuX9x1nK0810rLGAtrRzK_C-rfgVQd7J3QJplqYzMFr4OrJ2hZsth59t2Wpe-1nJpVPz2iezw7gYHHrUnxUZ5Gu44MSURmRtBDAeG7XGVNuDIwIUKzdnyhCxktyYtL4dfjS-3MUkFMoIhZqSQawhrrHO_fpHrUqqj8"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Guntur</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Delta" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhujIuSjDLXkemEQckTENwfTl__76v5p7Dhus12CZHZf-7ZnelDy9Ho0-VSTrYtGXqruiraI-n2AklRX86O2mjYc43ICdjH9b6Ry2i7iXCU7ZycfdAXHNhjz7A4WH0GuaJFPp0M0Mwkyd0LFlRAOFXtj2csNUUNxIH_2P_8YcZ6jcrgHa4RCZsg_CYYnR-lXPz6Ccv6jiF2F-0HB7hMBZ5Ypl4GSDSThVlkWLoX1uIghI3pzPlvfA3gBc7jvhUVwWCjWYzV0etO9o"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Delta</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Falcon" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuARTFWL39iNieABvKg-jJnFSk-1Y4Q5N5rTXMaN-lzzQbgZf5S1U-ZgjNM_QR6YSao_va0ttqR-cM-mC0YbYakzG4cz75UiYhqaOcIRr7XJ2em2X_7Uhw2qfjaLOS8Nj5deTxVDyumePwQHK7MAWSoCIXLpH_M5LBM0nS-xSksgTO51cUsz3OMwvDCm994LDSjHi01RzzAzIuW6i-yT3o94yTJcp9cHu43pA4MKNCn-Rd3iN3_OS18BSK7MrEyttt1XC1MBFzCBk_k"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Falcon</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Bayangan" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxxjPttlTKHC7MApY0v9nrCn71b427X0PMlT14y_ZJtVj69zO0K828jUIc6jyTSJb_mF5VDorz81PYbh3jhlSeWGtje5l89cmFbCo3sH9J0oM7nD_NgNOOwjr-EbgIR_xlEfRL5mJMhNzbj5MLo9BQbOVEENY0qyNeBqZ8iGXsRZqBqVRZje9CzMSkkXz_YMwElZQSeHbopY0Bc2i-jrYdj1jWPx_YNgyh71--bsR0kRuC3n7Uo1lIBBl6aGTxpm8JgQRXbU3LNIo"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Bayangan</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Garuda" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCuIex9FX3Z_5u5pHFBAAHsk9YP7DE4sqJhVaMoGgYSnFw4gXfJCjTthSYUl2koHlgdJTBTBghBbVQNe_kmPvncr4MKuDXFbgO6wQWw3Jzbiqr4CpqLfEpekrJYZ1Sdga1KD3P7-CWR_nvZJ7dF__GTAjhGgyvik0EdR8HJxnUjk5AZcGoSAQyTot8m205XsCWos7YfWq1ZiSzcoczgYiqJ3JQBuDf62h8sexMIEJfr44iwwoQAA2VTc1MmHFbEZ3guCLoOZOiIRds"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Garuda</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Guntur" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6IuSWZ4sq9XE9Jt-VUjByn6fSvPaEEf4Zuql1_Vvb_dnUiqO95irqnOoP-mq_ZgDnMTg15QCXR1R2XeuWDUQ7HhKoPsz9p_XyH3H2YOiUyGqP2Kr6K1lpUHhlIZh2tG_lBhusXeQ65wVaQtxc9lqYhBjwmtf4UG37esXNW1ZGXPln1597MF6RYEyqevjQSbrQlPpvXbdsHOZ2a_6kviSbtAZLA9QdkRDeHpoAIeJ5cQq9eueDLJHGh0_oRWbs0HZdy2_0rk9WsPg"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Guntur</div>
+</div>
+<div class="flex flex-col items-center gap-3 group cursor-pointer">
+<div class="w-[72px] h-[72px] rounded-xl border-2 border-primary/20 p-1.5 bg-surface-container-lowest overflow-hidden group-hover:border-primary/60 transition-all">
+<img alt="Pos Delta" class="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQ3Lc9snTsTFe71xP1G_-XVlqT_SxS2kbiB3c052EO6jEArcjqDDvdwwPqsNojAIpk2TlNJ1GYcQp7C5RPpf2IunOMUlXKI0Dy1yDnUIQqAWvZ4nqH0VwoL6t9MHnbrT6bEAK5Xfa041-K-6urnNjADIvRJpuoPPWrAkZ87q-u5PPxfuYIehwOoBOaOZqwXue5Z4Hkqdf1KTv8tNxVGuXWpr49OxhXEwwmkS_Cp3mWID3r42JhsaERE2zuRYy3C7H0FMnjjU41VbI"/>
+</div>
+<div class="text-[9px] text-on-surface-variant font-bold text-center uppercase tracking-widest leading-tight">Pos<br/>Delta</div>
+</div>
+</div>
+</main>
+<!-- END: MainContent -->
+</div>
+<!-- BEGIN: FooterStatus - Minimal and transparent as per Image 2 -->
+<footer class="h-12 flex items-center justify-between px-12 text-[10px] uppercase tracking-[0.2em] text-on-surface-variant/40 font-status z-50">
+<div class="flex items-center gap-8">
+<div class="flex gap-2">
+<div class="w-1.5 h-1.5 bg-primary/20 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary/40 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary rounded-sm shadow-glow-cyan"></div>
+<div class="w-1.5 h-1.5 bg-primary/40 rounded-sm"></div>
+<div class="w-1.5 h-1.5 bg-primary/20 rounded-sm"></div>
+</div>
+<span>System Status: <span class="text-primary font-bold">Optimal</span></span>
+</div>
+<!-- Dynamic dots/grid decorative element from bottom right of ref image -->
+<div class="flex gap-1.5">
+<div class="w-1.5 h-1.5 bg-primary/20"></div>
+<div class="w-1.5 h-1.5 bg-primary/20"></div>
+<div class="w-1.5 h-1.5 bg-primary/20"></div>
+<div class="w-1.5 h-1.5 bg-primary/40"></div>
+<div class="w-1.5 h-1.5 bg-primary/60"></div>
+<div class="w-1.5 h-1.5 bg-primary shadow-glow-cyan"></div>
+</div>
+</footer>
+<!-- END: FooterStatus -->
+</body></html>

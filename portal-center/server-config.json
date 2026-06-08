@@ -1,0 +1,8 @@
+{
+    "apiBaseUrl": "https://trizein.vercel.app/api/v1",
+    "appName": "Portal Center",
+    "orgName": "Markas Besar",
+    "orgSubtitle": "Command Center",
+    "statusCheckInterval": 30000,
+    "statusCheckTimeout": 3000
+}
