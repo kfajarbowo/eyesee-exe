@@ -19,18 +19,19 @@
 	<header class="header">
 		<!-- Top Row: Logo & Org -->
 		<div class="header-top">
-			<div class="header-logo">
-				<div class="logo-bars">
+			<div class="header-logo" id="btn-change-global-logo" title="Ganti Logo Aplikasi Utama" style="cursor:pointer">
+				<div class="logo-bars" id="global-logo-placeholder">
 					<div class="logo-bar"></div>
 					<div class="logo-bar"></div>
 					<div class="logo-bar"></div>
 				</div>
+				<img id="global-logo-img" style="display:none; height:24px; object-fit:contain; margin-right:8px" />
 				<span class="logo-text">PORTAL</span>
 			</div>
 			<div class="header-right">
 				<div class="header-org">
-					<div class="org-name" id="org-name">Markas Besar</div>
-					<div class="org-sub" id="org-sub">Command Center</div>
+					<div class="org-name" id="org-name">NXZZ</div>
+					<div class="org-sub" id="org-sub">Command Gate</div>
 				</div>
 				<div class="org-icon">
 					<svg viewBox="0 0 24 24" fill="currentColor">
@@ -73,6 +74,10 @@
 				<button class="sidebar-btn" id="btn-add-pos"><span class="plus">+</span> Add Pos</button>
 				<button class="sidebar-btn" id="btn-add-region"><span class="plus">+</span> Wilayah</button>
 			</div>
+			<div class="sidebar-buttons">
+				<button class="sidebar-btn sidebar-btn-manage" id="btn-edit-mode"><span class="manage-icon">&#9998;</span> Edit Pos</button>
+				<button class="sidebar-btn sidebar-btn-manage sidebar-btn-delete" id="btn-delete-mode"><span class="manage-icon">&#128465;</span> Del Pos</button>
+			</div>
 			<div class="sidebar-search">
 				<span class="search-icon">
 					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +93,12 @@
 		<div class="content-area">
 			<div class="content-header">
 				<div class="content-title" id="content-title">Memuat...</div>
-				<div class="content-count" id="content-count"></div>
+				<div class="content-right" style="display:flex; gap:12px; align-items:center;">
+					<div class="content-count" id="content-count"></div>
+					<button class="btn btn-outline" style="padding: 4px 12px; font-size: 11px;" id="btn-refresh" title="Shortcut: F5">
+						<span style="font-size: 14px;">&#8635;</span> Refresh
+					</button>
+				</div>
 			</div>
 
 			<!-- Loading -->
@@ -170,7 +180,7 @@
 			<div class="modal-title" id="modal-pos-title">Tambah Pos</div>
 			<button class="modal-close" onclick="closeModal('pos')">&times;</button>
 		</div>
-		<div class="modal-body">
+		<div class="modal-body custom-scrollbar" style="max-height: 60vh; overflow-y: auto;">
 			<input type="hidden" id="pos-edit-code" />
 			<div class="form-group">
 				<label>Kode Site</label>
@@ -190,6 +200,42 @@
 				<select id="pos-region"><option value="">— Pilih Wilayah —</option></select>
 			</div>
 			<div class="form-group">
+				<label>Gambar Site (Opsional)</label>
+				<input type="file" id="pos-image" accept="image/*" />
+				<div class="form-hint">Format: JPG, PNG, WebP — Maks 5MB</div>
+			</div>
+
+			<div style="margin-top: 16px; margin-bottom: 8px; font-weight: bold; color: var(--on-surface); font-size: 13px;">Alokasi IP Aplikasi</div>
+			<div class="form-group">
+				<label>Eyesee</label>
+				<div style="display:flex; gap:8px;">
+					<input type="text" id="pos-ip-eyesee" placeholder="IP Address (e.g. 172.27.3.11)" style="flex:1" />
+					<input type="number" id="pos-port-eyesee" placeholder="Port" style="width:80px" />
+				</div>
+			</div>
+			<div class="form-group">
+				<label>BMS</label>
+				<div style="display:flex; gap:8px;">
+					<input type="text" id="pos-ip-bms" placeholder="IP Address (e.g. 172.27.3.12)" style="flex:1" />
+					<input type="number" id="pos-port-bms" placeholder="Port" style="width:80px" />
+				</div>
+			</div>
+			<div class="form-group">
+				<label>BLM</label>
+				<div style="display:flex; gap:8px;">
+					<input type="text" id="pos-ip-blm" placeholder="IP Address (e.g. 172.27.3.13)" style="flex:1" />
+					<input type="number" id="pos-port-blm" placeholder="Port" style="width:80px" />
+				</div>
+			</div>
+			<div class="form-group">
+				<label>VCOM</label>
+				<div style="display:flex; gap:8px;">
+					<input type="text" id="pos-ip-vcom" placeholder="IP Address (e.g. 172.27.3.14)" style="flex:1" />
+					<input type="number" id="pos-port-vcom" placeholder="Port" style="width:80px" />
+				</div>
+			</div>
+
+			<div class="form-group" style="margin-top: 12px;">
 				<label>Deskripsi (opsional)</label>
 				<textarea id="pos-desc" placeholder="Deskripsi pos..."></textarea>
 			</div>
@@ -197,6 +243,30 @@
 		<div class="modal-footer">
 			<button class="btn btn-secondary" onclick="closeModal('pos')">Batal</button>
 			<button class="btn btn-primary" id="btn-save-pos">Simpan</button>
+		</div>
+	</div>
+</div>
+
+<!-- Modal: Global Logo -->
+<div class="modal-overlay" id="modal-global-logo">
+	<div class="modal">
+		<div class="modal-header">
+			<div class="modal-title">Ganti Logo Aplikasi Utama</div>
+			<button class="modal-close" onclick="closeModal('global-logo')">&times;</button>
+		</div>
+		<div class="modal-body">
+			<div class="form-group">
+				<label>Upload Logo Baru</label>
+				<input type="file" id="global-logo-file" accept="image/*" />
+				<div class="form-hint">Format: JPG, PNG, WebP, SVG — Maks 5MB</div>
+			</div>
+		</div>
+		<div class="modal-footer" style="justify-content: space-between;">
+			<button class="btn" style="color:#ef4444; background:transparent" id="btn-delete-global-logo">Hapus Logo</button>
+			<div style="display:flex; gap:8px;">
+				<button class="btn btn-secondary" onclick="closeModal('global-logo')">Batal</button>
+				<button class="btn btn-primary" id="btn-save-global-logo">Upload</button>
+			</div>
 		</div>
 	</div>
 </div>
@@ -228,6 +298,6 @@
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
-<script src="assets/js/app.js"></script>
+<script src="assets/js/app.js?v=2"></script>
 </body>
 </html>

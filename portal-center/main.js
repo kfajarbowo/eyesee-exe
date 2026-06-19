@@ -13,13 +13,17 @@ function loadConfig() {
 		return JSON.parse(fs.readFileSync(configPath, 'utf8'));
 	} catch (e) {
 		console.error('[Portal] Failed to load config:', e.message);
-		return { apiBaseUrl: 'https://trizein.vercel.app/api/v1' };
+		// return { apiBaseUrl: 'https://trizein.vercel.app/api/v1' };
+		return { apiBaseUrl: 'http://blm.id:3003' };
 	}
 }
 
 const config = loadConfig();
-const API_BASE = config.apiBaseUrl || 'https://trizein.vercel.app/api/v1';
+const API_BASE = config.apiBaseUrl || 'http://blm.id:3003';
+const API_KEY = config.apiKey || '';
 console.log('[Portal] API Base URL:', API_BASE);
+if (API_KEY) console.log('[Portal] API Key configured');
+else console.warn('[Portal] WARNING: No API key configured — CRUD operations may fail on protected servers');
 
 // ============================================================================
 // Chromium Flags for Media Codecs & GPU (HEVC / H.265 Support)
@@ -158,6 +162,18 @@ function createMainWindow() {
 		// mainWindow.webContents.openDevTools({ mode: 'detach' });
 	});
 
+	// F5 = reload data from API (send event to renderer)
+	// Ctrl+Shift+I = toggle DevTools
+	mainWindow.webContents.on('before-input-event', (event, input) => {
+		if (input.key === 'F5' && !input.control && !input.shift) {
+			mainWindow.webContents.send('reload-data');
+			event.preventDefault();
+		}
+		if (input.key === 'F12') {
+			mainWindow.webContents.openDevTools({ mode: 'detach' });
+		}
+	});
+
 	mainWindow.on('closed', () => {
 		mainWindow = null;
 	});
@@ -166,13 +182,23 @@ function createMainWindow() {
 // ── API Helper ─────────────────────────────────────────────────
 async function apiRequest(method, endpoint, body) {
 	const url = API_BASE + endpoint;
-	const opts = {
-		method,
-		headers: { 'Content-Type': 'application/json' },
-	};
+	const headers = { 'Content-Type': 'application/json' };
+	// Include API key for authentication (required by deployed server for mutations)
+	if (API_KEY) headers['X-API-Key'] = API_KEY;
+	const opts = { method, headers };
 	if (body) opts.body = JSON.stringify(body);
 
 	const res = await fetch(url, opts);
+	const json = await res.json();
+	if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
+	return json;
+}
+
+async function apiMultipartRequest(method, endpoint, formData) {
+	const url = API_BASE + endpoint;
+	const headers = {};
+	if (API_KEY) headers['X-API-Key'] = API_KEY;
+	const res = await fetch(url, { method, headers, body: formData });
 	const json = await res.json();
 	if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
 	return json;
@@ -192,6 +218,15 @@ ipcMain.handle('get-app-sites', (_, appKey) =>
 	apiRequest('GET', `/apps/${appKey}`)
 );
 ipcMain.handle('get-summary', () => apiRequest('GET', '/summary'));
+ipcMain.handle('get-api-origin', () => {
+	// Extract origin (scheme + host) from API base URL for image URL construction
+	try {
+		const u = new URL(API_BASE);
+		return u.origin;
+	} catch {
+		return '';
+	}
+});
 
 // ── IPC: Cache Origins ─────────────────────────────────────────
 ipcMain.handle('save-site-origins', (_, origins) => {
@@ -212,15 +247,49 @@ ipcMain.handle('update-region', (_, code, data) =>
 ipcMain.handle('delete-region', (_, code) =>
 	apiRequest('DELETE', `/regions/${code}`)
 );
-ipcMain.handle('create-site', (_, data) =>
-	apiRequest('POST', '/sites', data)
-);
-ipcMain.handle('update-site', (_, code, data) =>
-	apiRequest('PUT', `/sites/${code}`, data)
-);
+ipcMain.handle('create-site', (_, data) => {
+	if (data.file) {
+		const fd = new FormData();
+		for (const key in data.payload) {
+			fd.append(key, typeof data.payload[key] === 'object' ? JSON.stringify(data.payload[key]) : data.payload[key]);
+		}
+		fd.append('image', new Blob([data.file.buffer], { type: data.file.type }), data.file.name);
+		return apiMultipartRequest('POST', '/sites', fd);
+	}
+	return apiRequest('POST', '/sites', data.payload || data);
+});
+ipcMain.handle('update-site', (_, code, data) => {
+	if (data.file) {
+		const fd = new FormData();
+		for (const key in data.payload) {
+			fd.append(key, typeof data.payload[key] === 'object' ? JSON.stringify(data.payload[key]) : data.payload[key]);
+		}
+		fd.append('image', new Blob([data.file.buffer], { type: data.file.type }), data.file.name);
+		return apiMultipartRequest('PUT', `/sites/${code}`, fd);
+	}
+	// Support setting image to null (remove) if no file but payload has removeImage
+	if (data.removeImage) {
+		const fd = new FormData();
+		for (const key in data.payload) {
+			fd.append(key, typeof data.payload[key] === 'object' ? JSON.stringify(data.payload[key]) : data.payload[key]);
+		}
+		fd.append('removeImage', 'true');
+		return apiMultipartRequest('PUT', `/sites/${code}`, fd);
+	}
+	return apiRequest('PUT', `/sites/${code}`, data.payload || data);
+});
 ipcMain.handle('delete-site', (_, code) =>
 	apiRequest('DELETE', `/sites/${code}`)
 );
+
+// ── IPC: Global Settings ───────────────────────────────────────
+ipcMain.handle('get-global-logo-info', () => apiRequest('GET', '/settings/logo/info'));
+ipcMain.handle('update-global-logo', (_, file) => {
+	const fd = new FormData();
+	fd.append('logo', new Blob([file.buffer], { type: file.type }), file.name);
+	return apiMultipartRequest('PUT', '/settings/logo', fd);
+});
+ipcMain.handle('delete-global-logo', () => apiRequest('DELETE', '/settings/logo'));
 
 // ── IPC: Status check (HTTP HEAD) ─────────────────────────────
 // Uses HTTP HEAD instead of TCP ping because:

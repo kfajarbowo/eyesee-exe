@@ -1,5 +1,6 @@
 {
-    "apiBaseUrl": "https://trizein.vercel.app/api/v1",
+    "apiBaseUrl": "http://blm.id:3003/api/v1",
+    "apiKey": "clb-mstr-ip-k3y-2026",
     "appName": "Portal Center",
     "orgName": "Markas Besar",
     "orgSubtitle": "Command Center",

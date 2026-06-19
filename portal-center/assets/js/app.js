@@ -12,6 +12,8 @@
 		currentApp: 'eyesee',
 		siteStatuses: {},   // siteCode -> { online, responseTime }
 		statusTimer: null,
+		apiOrigin: '',      // API origin (scheme + host) for building image URLs
+		manageMode: null,   // null | 'edit' | 'delete'
 		posImages: [
 			'assets/images/pos-1.png',
 			'assets/images/pos-2.png',
@@ -90,6 +92,15 @@
 		document.getElementById('pos-name').value = '';
 		document.getElementById('pos-blockip').value = '';
 		document.getElementById('pos-desc').value = '';
+		document.getElementById('pos-image').value = '';
+		document.getElementById('pos-ip-eyesee').value = '';
+		document.getElementById('pos-port-eyesee').value = '';
+		document.getElementById('pos-ip-bms').value = '';
+		document.getElementById('pos-port-bms').value = '';
+		document.getElementById('pos-ip-blm').value = '';
+		document.getElementById('pos-port-blm').value = '';
+		document.getElementById('pos-ip-vcom').value = '';
+		document.getElementById('pos-port-vcom').value = '';
 		populateRegionDropdown();
 		openModal('pos');
 	});
@@ -103,6 +114,38 @@
 		document.getElementById('region-desc').value = '';
 		openModal('region');
 	});
+
+	// ── Manage Mode Toggle ────────────────────────────────────
+	document.getElementById('btn-edit-mode').addEventListener('click', function () {
+		if (state.manageMode === 'edit') {
+			exitManageMode();
+		} else {
+			enterManageMode('edit');
+		}
+	});
+
+	document.getElementById('btn-delete-mode').addEventListener('click', function () {
+		if (state.manageMode === 'delete') {
+			exitManageMode();
+		} else {
+			enterManageMode('delete');
+		}
+	});
+
+	function enterManageMode(mode) {
+		state.manageMode = mode;
+		document.getElementById('btn-edit-mode').classList.toggle('active', mode === 'edit');
+		document.getElementById('btn-delete-mode').classList.toggle('active', mode === 'delete');
+		renderPosGrid();
+	}
+
+	function exitManageMode() {
+		state.manageMode = null;
+		document.getElementById('btn-edit-mode').classList.remove('active');
+		document.getElementById('btn-delete-mode').classList.remove('active');
+		renderPosGrid();
+	}
+	window.exitManageMode = exitManageMode;
 
 	// ── Save Region ─────────────────────────────────────────────
 	document.getElementById('btn-save-region').addEventListener('click', async function () {
@@ -152,18 +195,36 @@
 			return;
 		}
 
+		var ips = [];
+		if (document.getElementById('pos-ip-eyesee').value.trim()) ips.push({ appKey: 'eyesee', ipAddress: document.getElementById('pos-ip-eyesee').value.trim(), port: document.getElementById('pos-port-eyesee').value ? parseInt(document.getElementById('pos-port-eyesee').value) : null });
+		if (document.getElementById('pos-ip-bms').value.trim()) ips.push({ appKey: 'bms', ipAddress: document.getElementById('pos-ip-bms').value.trim(), port: document.getElementById('pos-port-bms').value ? parseInt(document.getElementById('pos-port-bms').value) : null });
+		if (document.getElementById('pos-ip-blm').value.trim()) ips.push({ appKey: 'blm', ipAddress: document.getElementById('pos-ip-blm').value.trim(), port: document.getElementById('pos-port-blm').value ? parseInt(document.getElementById('pos-port-blm').value) : null });
+		if (document.getElementById('pos-ip-vcom').value.trim()) ips.push({ appKey: 'vcom', ipAddress: document.getElementById('pos-ip-vcom').value.trim(), port: document.getElementById('pos-port-vcom').value ? parseInt(document.getElementById('pos-port-vcom').value) : null });
+
+		var fileInput = document.getElementById('pos-image');
+		var fileObj = null;
+		if (fileInput.files.length > 0) {
+			var file = fileInput.files[0];
+			if (file.size > 5 * 1024 * 1024) {
+				showToast('Gambar terlalu besar. Maks 5MB.', 'error');
+				return;
+			}
+			var buffer = await file.arrayBuffer();
+			fileObj = { name: file.name, type: file.type, buffer: buffer };
+		}
+
 		try {
 			if (editCode) {
-				var updateData = { siteName: name, blockIp: blockIp, description: desc || null };
+				var updateData = { siteName: name, blockIp: blockIp, description: desc || null, ips: ips };
 				if (regionId) updateData.regionId = parseInt(regionId);
 				else updateData.regionId = null;
-				await window.portal.updateSite(editCode, updateData);
+				await window.portal.updateSite(editCode, { payload: updateData, file: fileObj });
 				showToast('Pos berhasil diperbarui', 'success');
 			} else {
-				var createData = { siteCode: code, siteName: name, blockIp: blockIp };
+				var createData = { siteCode: code, siteName: name, blockIp: blockIp, ips: ips };
 				if (desc) createData.description = desc;
 				if (regionId) createData.regionId = parseInt(regionId);
-				await window.portal.createSite(createData);
+				await window.portal.createSite({ payload: createData, file: fileObj });
 				showToast('Pos berhasil ditambahkan', 'success');
 			}
 			closeModal('pos');
@@ -234,6 +295,15 @@
 		document.getElementById('pos-name').value = site.siteName;
 		document.getElementById('pos-blockip').value = site.blockIp || '';
 		document.getElementById('pos-desc').value = site.description || '';
+		document.getElementById('pos-image').value = '';
+		document.getElementById('pos-ip-eyesee').value = getAppInfo(site, 'eyesee') ? getAppInfo(site, 'eyesee').ip : '';
+		document.getElementById('pos-port-eyesee').value = getAppInfo(site, 'eyesee') && getAppInfo(site, 'eyesee').port ? getAppInfo(site, 'eyesee').port : '';
+		document.getElementById('pos-ip-bms').value = getAppInfo(site, 'bms') ? getAppInfo(site, 'bms').ip : '';
+		document.getElementById('pos-port-bms').value = getAppInfo(site, 'bms') && getAppInfo(site, 'bms').port ? getAppInfo(site, 'bms').port : '';
+		document.getElementById('pos-ip-blm').value = getAppInfo(site, 'blm') ? getAppInfo(site, 'blm').ip : '';
+		document.getElementById('pos-port-blm').value = getAppInfo(site, 'blm') && getAppInfo(site, 'blm').port ? getAppInfo(site, 'blm').port : '';
+		document.getElementById('pos-ip-vcom').value = getAppInfo(site, 'vcom') ? getAppInfo(site, 'vcom').ip : '';
+		document.getElementById('pos-port-vcom').value = getAppInfo(site, 'vcom') && getAppInfo(site, 'vcom').port ? getAppInfo(site, 'vcom').port : '';
 		populateRegionDropdown(site.regionId);
 		openModal('pos');
 	}
@@ -378,10 +448,33 @@
 		dom.posGrid.style.display = 'grid';
 		dom.posGrid.innerHTML = '';
 
+		// Apply manage mode class to grid
+		dom.posGrid.classList.remove('edit-mode', 'delete-mode');
+		if (state.manageMode === 'edit') dom.posGrid.classList.add('edit-mode');
+		else if (state.manageMode === 'delete') dom.posGrid.classList.add('delete-mode');
+
+		// Show manage mode banner in content header
+		var existingBanner = document.querySelector('.manage-mode-banner');
+		if (existingBanner) existingBanner.remove();
+
+		if (state.manageMode) {
+			var banner = document.createElement('div');
+			var isEdit = state.manageMode === 'edit';
+			banner.className = 'manage-mode-banner ' + (isEdit ? 'edit-banner' : 'delete-banner');
+			banner.innerHTML = (isEdit ? '&#9998; Mode Edit — Klik site untuk mengedit' : '&#128465; Mode Hapus — Klik site untuk menghapus') +
+				' <button class="btn-done" onclick="exitManageMode()">✓ Selesai</button>';
+			var contentHeader = document.querySelector('.content-header');
+			contentHeader.parentNode.insertBefore(banner, contentHeader.nextSibling);
+		}
+
 		sites.forEach(function (site, idx) {
 			var appInfo = getAppInfo(site, state.currentApp);
 			var status = state.siteStatuses[site.siteCode];
-			var img = state.posImages[idx % state.posImages.length];
+			
+			// If site has an image from API, use the constructed URL, else fallback to random generic pos image
+			var img = site.hasImage && site.imageUrl && state.apiOrigin
+				? state.apiOrigin + site.imageUrl
+				: state.posImages[idx % state.posImages.length];
 
 			var card = document.createElement('div');
 			card.className = 'pos-card';
@@ -398,18 +491,37 @@
 				? nameParts[0] + '<br/>' + nameParts.slice(1).join(' ')
 				: nameParts[0];
 
+			// Build manage overlay HTML
+			var overlayHtml = '';
+			if (state.manageMode === 'edit') {
+				overlayHtml = '<div class="manage-overlay edit-overlay"><div class="manage-overlay-icon">&#9998;</div></div>';
+			} else if (state.manageMode === 'delete') {
+				overlayHtml = '<div class="manage-overlay delete-overlay"><div class="manage-overlay-icon">&#128465;</div></div>';
+			}
+
 			card.innerHTML =
 				'<div class="pos-card-thumb">' +
-					'<img src="' + img + '" alt="' + escapeHtml(site.siteName) + '" />' +
+					'<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(site.siteName) + '" />' +
 					'<div class="pos-card-status ' + statusClass + '"></div>' +
 				'</div>' +
+				overlayHtml +
 				'<div class="pos-card-info">' +
 					'<div class="pos-card-name">' + displayName + '</div>' +
-					(appInfo ? '<div class="pos-card-ip">' + appInfo.ip + (appInfo.port ? ':' + appInfo.port : '') + '</div>' : '') +
+					(appInfo ? '<div class="pos-card-ip">' + escapeHtml(appInfo.ip) + (appInfo.port ? ':' + escapeHtml(appInfo.port) : '') + '</div>' : '') +
 				'</div>';
 
-			// Click to open app — always read LIVE status from state (not stale closure)
+			// Click behavior depends on manage mode
 			card.addEventListener('click', function () {
+				if (state.manageMode === 'edit') {
+					editSite(site);
+					return;
+				}
+				if (state.manageMode === 'delete') {
+					confirmDeleteSite(site);
+					return;
+				}
+
+				// Normal mode: open app
 				var liveStatus = state.siteStatuses[site.siteCode];
 
 				// Block if no IP for this app
@@ -539,14 +651,16 @@
 		dom.emptyState.style.display = 'none';
 
 		try {
-			// Fetch regions & sites (with region info) in parallel
+			// Fetch regions, sites (with region info), and apiOrigin in parallel
 			var results = await Promise.all([
 				window.portal.getRegions(),
 				window.portal.getSites('includeRegion=true'),
+				window.portal.getApiOrigin && window.portal.getApiOrigin()
 			]);
 
 			var regionsData = results[0];
 			var sitesData = results[1];
+			if (results[2]) state.apiOrigin = results[2];
 
 			state.regions = (regionsData && regionsData.data) ? regionsData.data : [];
 
@@ -603,6 +717,7 @@
 			renderRegionList();
 			renderPosGrid();
 			startStatusPolling();
+			loadGlobalLogo();
 		} catch (e) {
 			dom.loadingState.style.display = 'none';
 			dom.emptyState.style.display = 'flex';
@@ -623,7 +738,75 @@
 		dom.contextMenu.classList.remove('active');
 	}, true);
 
-	// ── Initialize ──────────────────────────────────────────────
+	// ── Global Logo ─────────────────────────────────────────────
+	async function loadGlobalLogo() {
+		try {
+			var info = await window.portal.getGlobalLogoInfo();
+			var p = document.getElementById('global-logo-placeholder');
+			var img = document.getElementById('global-logo-img');
+			if (info.status === 'success' && info.data.hasLogo && state.apiOrigin) {
+				p.style.display = 'none';
+				img.style.display = 'block';
+				img.src = state.apiOrigin + info.data.logoUrl + '?t=' + (info.data.updatedAt || Date.now());
+			} else {
+				p.style.display = 'flex';
+				img.style.display = 'none';
+			}
+		} catch (e) {
+			console.error('Failed to load global logo:', e);
+		}
+	}
+
+	if (document.getElementById('btn-change-global-logo')) {
+		document.getElementById('btn-change-global-logo').addEventListener('click', function () {
+			document.getElementById('global-logo-file').value = '';
+			openModal('global-logo');
+		});
+
+		document.getElementById('btn-save-global-logo').addEventListener('click', async function () {
+			var fileInput = document.getElementById('global-logo-file');
+			if (fileInput.files.length === 0) {
+				showToast('Pilih file logo terlebih dahulu', 'error');
+				return;
+			}
+			try {
+				var file = fileInput.files[0];
+				var buffer = await file.arrayBuffer();
+				var fileObj = { name: file.name, type: file.type, buffer: buffer };
+				await window.portal.updateGlobalLogo(fileObj);
+				showToast('Logo berhasil diupload', 'success');
+				closeModal('global-logo');
+				loadGlobalLogo();
+			} catch (e) {
+				showToast('Gagal upload logo: ' + (e.message || 'Unknown error'), 'error');
+			}
+		});
+
+		document.getElementById('btn-delete-global-logo').addEventListener('click', async function () {
+			try {
+				await window.portal.deleteGlobalLogo();
+				showToast('Logo berhasil dihapus', 'success');
+				closeModal('global-logo');
+				loadGlobalLogo();
+			} catch (e) {
+				showToast('Gagal menghapus logo: ' + (e.message || 'Unknown error'), 'error');
+			}
+		});
+	}
+
+	// ── Initialize & Events ─────────────────────────────────────
+	if (document.getElementById('btn-refresh')) {
+		document.getElementById('btn-refresh').addEventListener('click', function() {
+			loadData();
+		});
+	}
+
+	if (window.portal.onReloadData) {
+		window.portal.onReloadData(function() {
+			loadData();
+		});
+	}
+
 	loadData();
 
 })();
