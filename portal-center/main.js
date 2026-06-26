@@ -14,12 +14,13 @@ function loadConfig() {
 	} catch (e) {
 		console.error('[Portal] Failed to load config:', e.message);
 		// return { apiBaseUrl: 'https://trizein.vercel.app/api/v1' };
-		return { apiBaseUrl: 'http://blm.id:3003' };
+		return { apiBaseUrl: 'http://localhost:3003' };
+		// return { apiBaseUrl: 'http://blm.id:3003' };
 	}
 }
 
 const config = loadConfig();
-const API_BASE = config.apiBaseUrl || 'http://blm.id:3003';
+const API_BASE = config.apiBaseUrl || 'http://localhost:3003/api/v1';
 const API_KEY = config.apiKey || '';
 console.log('[Portal] API Base URL:', API_BASE);
 if (API_KEY) console.log('[Portal] API Key configured');
@@ -253,7 +254,9 @@ ipcMain.handle('create-site', (_, data) => {
 		for (const key in data.payload) {
 			fd.append(key, typeof data.payload[key] === 'object' ? JSON.stringify(data.payload[key]) : data.payload[key]);
 		}
-		fd.append('image', new Blob([data.file.buffer], { type: data.file.type }), data.file.name);
+		// IPC may serialize ArrayBuffer to Buffer/Uint8Array — normalize for Blob
+		const buf = Buffer.from(data.file.buffer);
+		fd.append('image', new Blob([buf], { type: data.file.type }), data.file.name);
 		return apiMultipartRequest('POST', '/sites', fd);
 	}
 	return apiRequest('POST', '/sites', data.payload || data);
@@ -264,7 +267,9 @@ ipcMain.handle('update-site', (_, code, data) => {
 		for (const key in data.payload) {
 			fd.append(key, typeof data.payload[key] === 'object' ? JSON.stringify(data.payload[key]) : data.payload[key]);
 		}
-		fd.append('image', new Blob([data.file.buffer], { type: data.file.type }), data.file.name);
+		// IPC may serialize ArrayBuffer to Buffer/Uint8Array — normalize for Blob
+		const buf = Buffer.from(data.file.buffer);
+		fd.append('image', new Blob([buf], { type: data.file.type }), data.file.name);
 		return apiMultipartRequest('PUT', `/sites/${code}`, fd);
 	}
 	// Support setting image to null (remove) if no file but payload has removeImage

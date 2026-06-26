@@ -339,6 +339,12 @@ html, body {
 	font-size: 8px; font-family: var(--font-status);
 	color: var(--on-surface-variant-60); margin-top: 2px;
 }
+.pos-card-ip.unconfigured {
+	color: var(--offline);
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	opacity: 0.8;
+}
 
 /* ── Empty State ─────────────────────────────────────────────── */
 .empty-state {
@@ -461,7 +467,72 @@ html, body {
 	border-color: var(--primary-60); box-shadow: 0 0 8px var(--primary-10);
 }
 .form-group textarea { resize: vertical; min-height: 60px; }
+
+/* IP/Port Combined Input Group */
+.ip-port-group {
+	display: flex;
+	align-items: center;
+	background: var(--primary-5);
+	border: 1px solid var(--outline-variant);
+	border-radius: 6px;
+	transition: var(--transition);
+	overflow: hidden;
+}
+.ip-port-group:focus-within {
+	border-color: var(--primary-60);
+	box-shadow: 0 0 8px var(--primary-10);
+}
+.form-group .ip-port-group input {
+	border: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	border-radius: 0;
+}
+.ip-port-group .ip-input {
+	flex: 1;
+}
+.ip-port-group .port-separator {
+	color: var(--primary-40);
+	font-weight: 900;
+	user-select: none;
+}
+.ip-port-group .port-input {
+	width: 100px;
+	text-align: center;
+	background: rgba(0, 218, 243, 0.05) !important;
+	border-left: 1px dashed var(--outline-variant-40) !important;
+	color: var(--primary) !important;
+	font-weight: 600;
+}
+.ip-port-group .port-input::placeholder {
+	color: var(--primary-30);
+	font-weight: 400;
+	font-size: 12px;
+}
+
 .form-hint { font-size: 11px; color: var(--on-surface-variant-60); margin-top: 4px; }
+
+/* Select dropdown dark theme */
+.form-group select {
+	appearance: none;
+	-webkit-appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300daf3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 12px center;
+	padding-right: 36px;
+	cursor: pointer;
+}
+.form-group select option {
+	background-color: #142225;
+	color: #d6e5e9;
+	padding: 8px 12px;
+}
+.form-group select option:hover,
+.form-group select option:checked {
+	background-color: rgba(0, 218, 243, 0.2);
+	color: #00daf3;
+}
+
 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 20px 16px; }
 
 /* ── Context Menu ────────────────────────────────────────────── */

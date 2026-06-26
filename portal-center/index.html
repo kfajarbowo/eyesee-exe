@@ -72,7 +72,7 @@
 		<aside class="sidebar">
 			<div class="sidebar-buttons">
 				<button class="sidebar-btn" id="btn-add-pos"><span class="plus">+</span> Add Pos</button>
-				<button class="sidebar-btn" id="btn-add-region"><span class="plus">+</span> Wilayah</button>
+				<button class="sidebar-btn" id="btn-add-region"><span class="plus">+</span>Add Wilayah</button>
 			</div>
 			<div class="sidebar-buttons">
 				<button class="sidebar-btn sidebar-btn-manage" id="btn-edit-mode"><span class="manage-icon">&#9998;</span> Edit Pos</button>
@@ -201,6 +201,7 @@
 			</div>
 			<div class="form-group">
 				<label>Gambar Site (Opsional)</label>
+				<div id="pos-image-preview" style="display:none; margin-bottom:8px;"></div>
 				<input type="file" id="pos-image" accept="image/*" />
 				<div class="form-hint">Format: JPG, PNG, WebP — Maks 5MB</div>
 			</div>
@@ -208,30 +209,34 @@
 			<div style="margin-top: 16px; margin-bottom: 8px; font-weight: bold; color: var(--on-surface); font-size: 13px;">Alokasi IP Aplikasi</div>
 			<div class="form-group">
 				<label>Eyesee</label>
-				<div style="display:flex; gap:8px;">
-					<input type="text" id="pos-ip-eyesee" placeholder="IP Address (e.g. 172.27.3.11)" style="flex:1" />
-					<input type="number" id="pos-port-eyesee" placeholder="Port" style="width:80px" />
+				<div class="ip-port-group">
+					<input type="text" id="pos-ip-eyesee" class="ip-input" placeholder="IP Address (e.g. 172.27.3.11)" />
+					<span class="port-separator">:</span>
+					<input type="number" id="pos-port-eyesee" class="port-input" placeholder="Def: 3000" />
 				</div>
 			</div>
 			<div class="form-group">
 				<label>BMS</label>
-				<div style="display:flex; gap:8px;">
-					<input type="text" id="pos-ip-bms" placeholder="IP Address (e.g. 172.27.3.12)" style="flex:1" />
-					<input type="number" id="pos-port-bms" placeholder="Port" style="width:80px" />
+				<div class="ip-port-group">
+					<input type="text" id="pos-ip-bms" class="ip-input" placeholder="IP Address (e.g. 172.27.3.12)" />
+					<span class="port-separator">:</span>
+					<input type="number" id="pos-port-bms" class="port-input" placeholder="Def: 8502" />
 				</div>
 			</div>
 			<div class="form-group">
 				<label>BLM</label>
-				<div style="display:flex; gap:8px;">
-					<input type="text" id="pos-ip-blm" placeholder="IP Address (e.g. 172.27.3.13)" style="flex:1" />
-					<input type="number" id="pos-port-blm" placeholder="Port" style="width:80px" />
+				<div class="ip-port-group">
+					<input type="text" id="pos-ip-blm" class="ip-input" placeholder="IP Address (e.g. 172.27.3.13)" />
+					<span class="port-separator">:</span>
+					<input type="number" id="pos-port-blm" class="port-input" placeholder="Def: 80" />
 				</div>
 			</div>
 			<div class="form-group">
 				<label>VCOM</label>
-				<div style="display:flex; gap:8px;">
-					<input type="text" id="pos-ip-vcom" placeholder="IP Address (e.g. 172.27.3.14)" style="flex:1" />
-					<input type="number" id="pos-port-vcom" placeholder="Port" style="width:80px" />
+				<div class="ip-port-group">
+					<input type="text" id="pos-ip-vcom" class="ip-input" placeholder="IP Address (e.g. 172.27.3.14)" />
+					<span class="port-separator">:</span>
+					<input type="number" id="pos-port-vcom" class="port-input" placeholder="Def: 5000" />
 				</div>
 			</div>
 

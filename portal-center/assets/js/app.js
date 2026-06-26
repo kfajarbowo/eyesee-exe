@@ -59,12 +59,12 @@
 		document.getElementById('modal-' + type).classList.remove('active');
 	};
 
-	// Close modal on overlay click
-	document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
-		overlay.addEventListener('click', function (e) {
-			if (e.target === overlay) overlay.classList.remove('active');
-		});
-	});
+	// Close modal on overlay click (Disabled as requested)
+	// document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+	// 	overlay.addEventListener('click', function (e) {
+	// 		if (e.target === overlay) overlay.classList.remove('active');
+	// 	});
+	// });
 
 	// ── App Tabs ────────────────────────────────────────────────
 	document.querySelectorAll('.app-tab').forEach(function (tab) {
@@ -93,6 +93,7 @@
 		document.getElementById('pos-blockip').value = '';
 		document.getElementById('pos-desc').value = '';
 		document.getElementById('pos-image').value = '';
+		hideImagePreview();
 		document.getElementById('pos-ip-eyesee').value = '';
 		document.getElementById('pos-port-eyesee').value = '';
 		document.getElementById('pos-ip-bms').value = '';
@@ -196,10 +197,10 @@
 		}
 
 		var ips = [];
-		if (document.getElementById('pos-ip-eyesee').value.trim()) ips.push({ appKey: 'eyesee', ipAddress: document.getElementById('pos-ip-eyesee').value.trim(), port: document.getElementById('pos-port-eyesee').value ? parseInt(document.getElementById('pos-port-eyesee').value) : null });
-		if (document.getElementById('pos-ip-bms').value.trim()) ips.push({ appKey: 'bms', ipAddress: document.getElementById('pos-ip-bms').value.trim(), port: document.getElementById('pos-port-bms').value ? parseInt(document.getElementById('pos-port-bms').value) : null });
-		if (document.getElementById('pos-ip-blm').value.trim()) ips.push({ appKey: 'blm', ipAddress: document.getElementById('pos-ip-blm').value.trim(), port: document.getElementById('pos-port-blm').value ? parseInt(document.getElementById('pos-port-blm').value) : null });
-		if (document.getElementById('pos-ip-vcom').value.trim()) ips.push({ appKey: 'vcom', ipAddress: document.getElementById('pos-ip-vcom').value.trim(), port: document.getElementById('pos-port-vcom').value ? parseInt(document.getElementById('pos-port-vcom').value) : null });
+		ips.push({ appKey: 'eyesee', ipAddress: document.getElementById('pos-ip-eyesee').value.trim() || '0.0.0.0', port: document.getElementById('pos-port-eyesee').value ? parseInt(document.getElementById('pos-port-eyesee').value) : null });
+		ips.push({ appKey: 'bms', ipAddress: document.getElementById('pos-ip-bms').value.trim() || '0.0.0.0', port: document.getElementById('pos-port-bms').value ? parseInt(document.getElementById('pos-port-bms').value) : null });
+		ips.push({ appKey: 'blm', ipAddress: document.getElementById('pos-ip-blm').value.trim() || '0.0.0.0', port: document.getElementById('pos-port-blm').value ? parseInt(document.getElementById('pos-port-blm').value) : null });
+		ips.push({ appKey: 'chat', ipAddress: document.getElementById('pos-ip-vcom').value.trim() || '0.0.0.0', port: document.getElementById('pos-port-vcom').value ? parseInt(document.getElementById('pos-port-vcom').value) : null });
 
 		var fileInput = document.getElementById('pos-image');
 		var fileObj = null;
@@ -235,16 +236,31 @@
 	});
 
 	// ── Populate Region Dropdown ────────────────────────────────
-	function populateRegionDropdown(selectedId) {
+	function populateRegionDropdown(selectedRegionCode) {
 		var sel = document.getElementById('pos-region');
 		sel.innerHTML = '<option value="">— Pilih Wilayah —</option>';
 		state.regions.forEach(function (r) {
 			var opt = document.createElement('option');
 			opt.value = r.id;
 			opt.textContent = r.regionName;
-			if (selectedId && r.id === selectedId) opt.selected = true;
+			if (selectedRegionCode && r.regionCode === selectedRegionCode) opt.selected = true;
 			sel.appendChild(opt);
 		});
+	}
+
+	// ── Image Preview Helpers ───────────────────────────────────
+	function showImagePreview(url) {
+		var container = document.getElementById('pos-image-preview');
+		if (!container) return;
+		container.innerHTML = '<img src="' + escapeHtml(url) + '" alt="Site image" style="max-width:100%;max-height:120px;border-radius:6px;border:1px solid var(--outline-variant);object-fit:cover;" />';
+		container.style.display = 'block';
+	}
+
+	function hideImagePreview() {
+		var container = document.getElementById('pos-image-preview');
+		if (!container) return;
+		container.innerHTML = '';
+		container.style.display = 'none';
 	}
 
 	// ── Context Menu ────────────────────────────────────────────
@@ -282,7 +298,7 @@
 		document.getElementById('region-code').value = region.regionCode;
 		document.getElementById('region-code').disabled = true;
 		document.getElementById('region-name').value = region.regionName;
-		document.getElementById('region-desc').value = region.description || '';
+		document.getElementById('region-desc').value = (region.description && region.description !== 'null') ? region.description : '';
 		openModal('region');
 	}
 
@@ -294,17 +310,34 @@
 		document.getElementById('pos-code').disabled = true;
 		document.getElementById('pos-name').value = site.siteName;
 		document.getElementById('pos-blockip').value = site.blockIp || '';
-		document.getElementById('pos-desc').value = site.description || '';
+		document.getElementById('pos-desc').value = (site.description && site.description !== 'null') ? site.description : '';
 		document.getElementById('pos-image').value = '';
-		document.getElementById('pos-ip-eyesee').value = getAppInfo(site, 'eyesee') ? getAppInfo(site, 'eyesee').ip : '';
-		document.getElementById('pos-port-eyesee').value = getAppInfo(site, 'eyesee') && getAppInfo(site, 'eyesee').port ? getAppInfo(site, 'eyesee').port : '';
-		document.getElementById('pos-ip-bms').value = getAppInfo(site, 'bms') ? getAppInfo(site, 'bms').ip : '';
-		document.getElementById('pos-port-bms').value = getAppInfo(site, 'bms') && getAppInfo(site, 'bms').port ? getAppInfo(site, 'bms').port : '';
-		document.getElementById('pos-ip-blm').value = getAppInfo(site, 'blm') ? getAppInfo(site, 'blm').ip : '';
-		document.getElementById('pos-port-blm').value = getAppInfo(site, 'blm') && getAppInfo(site, 'blm').port ? getAppInfo(site, 'blm').port : '';
-		document.getElementById('pos-ip-vcom').value = getAppInfo(site, 'vcom') ? getAppInfo(site, 'vcom').ip : '';
-		document.getElementById('pos-port-vcom').value = getAppInfo(site, 'vcom') && getAppInfo(site, 'vcom').port ? getAppInfo(site, 'vcom').port : '';
-		populateRegionDropdown(site.regionId);
+
+		// Show image preview if site has an existing image
+		if (site.hasImage && site.imageUrl && state.apiOrigin) {
+			showImagePreview(state.apiOrigin + site.imageUrl + '?t=' + Date.now());
+		} else {
+			hideImagePreview();
+		}
+
+		var eyeseeIp = getAppInfo(site, 'eyesee');
+		document.getElementById('pos-ip-eyesee').value = (eyeseeIp && eyeseeIp.ip !== '0.0.0.0') ? eyeseeIp.ip : '';
+		document.getElementById('pos-port-eyesee').value = (eyeseeIp && eyeseeIp.port) ? eyeseeIp.port : '';
+
+		var bmsIp = getAppInfo(site, 'bms');
+		document.getElementById('pos-ip-bms').value = (bmsIp && bmsIp.ip !== '0.0.0.0') ? bmsIp.ip : '';
+		document.getElementById('pos-port-bms').value = (bmsIp && bmsIp.port) ? bmsIp.port : '';
+
+		var blmIp = getAppInfo(site, 'blm');
+		document.getElementById('pos-ip-blm').value = (blmIp && blmIp.ip !== '0.0.0.0') ? blmIp.ip : '';
+		document.getElementById('pos-port-blm').value = (blmIp && blmIp.port) ? blmIp.port : '';
+
+		// Backend stores VCOM as 'chat' appKey
+		var chatIp = getAppInfo(site, 'chat');
+		document.getElementById('pos-ip-vcom').value = (chatIp && chatIp.ip !== '0.0.0.0') ? chatIp.ip : '';
+		document.getElementById('pos-port-vcom').value = (chatIp && chatIp.port) ? chatIp.port : '';
+		// Use _regionCode (resolved in loadData) for dropdown pre-selection
+		populateRegionDropdown(site._regionCode);
 		openModal('pos');
 	}
 
@@ -438,6 +471,21 @@
 		}
 		dom.contentCount.textContent = sites.length + ' site';
 
+		// Show manage mode banner in content header (must be before empty-state return
+		// so the "Selesai" button is always accessible even when region has 0 sites)
+		var existingBanner = document.querySelector('.manage-mode-banner');
+		if (existingBanner) existingBanner.remove();
+
+		if (state.manageMode) {
+			var banner = document.createElement('div');
+			var isEdit = state.manageMode === 'edit';
+			banner.className = 'manage-mode-banner ' + (isEdit ? 'edit-banner' : 'delete-banner');
+			banner.innerHTML = (isEdit ? '&#9998; Mode Edit — Klik site untuk mengedit' : '&#128465; Mode Hapus — Klik site untuk menghapus') +
+				' <button class="btn-done" onclick="exitManageMode()">✓ Selesai</button>';
+			var contentHeader = document.querySelector('.content-header');
+			contentHeader.parentNode.insertBefore(banner, contentHeader.nextSibling);
+		}
+
 		if (sites.length === 0) {
 			dom.posGrid.style.display = 'none';
 			dom.emptyState.style.display = 'flex';
@@ -453,27 +501,13 @@
 		if (state.manageMode === 'edit') dom.posGrid.classList.add('edit-mode');
 		else if (state.manageMode === 'delete') dom.posGrid.classList.add('delete-mode');
 
-		// Show manage mode banner in content header
-		var existingBanner = document.querySelector('.manage-mode-banner');
-		if (existingBanner) existingBanner.remove();
-
-		if (state.manageMode) {
-			var banner = document.createElement('div');
-			var isEdit = state.manageMode === 'edit';
-			banner.className = 'manage-mode-banner ' + (isEdit ? 'edit-banner' : 'delete-banner');
-			banner.innerHTML = (isEdit ? '&#9998; Mode Edit — Klik site untuk mengedit' : '&#128465; Mode Hapus — Klik site untuk menghapus') +
-				' <button class="btn-done" onclick="exitManageMode()">✓ Selesai</button>';
-			var contentHeader = document.querySelector('.content-header');
-			contentHeader.parentNode.insertBefore(banner, contentHeader.nextSibling);
-		}
-
 		sites.forEach(function (site, idx) {
 			var appInfo = getAppInfo(site, state.currentApp);
 			var status = state.siteStatuses[site.siteCode];
 			
 			// If site has an image from API, use the constructed URL, else fallback to random generic pos image
 			var img = site.hasImage && site.imageUrl && state.apiOrigin
-				? state.apiOrigin + site.imageUrl
+				? state.apiOrigin + site.imageUrl + '?t=' + Date.now()
 				: state.posImages[idx % state.posImages.length];
 
 			var card = document.createElement('div');
@@ -499,6 +533,13 @@
 				overlayHtml = '<div class="manage-overlay delete-overlay"><div class="manage-overlay-icon">&#128465;</div></div>';
 			}
 
+			var ipDisplay = '';
+			if (!appInfo || !appInfo.ip || appInfo.ip === '0.0.0.0') {
+				ipDisplay = '<div class="pos-card-ip unconfigured">BELUM DISETTING</div>';
+			} else {
+				ipDisplay = '<div class="pos-card-ip">' + escapeHtml(appInfo.ip) + (appInfo.port ? ':' + escapeHtml(appInfo.port) : '') + '</div>';
+			}
+
 			card.innerHTML =
 				'<div class="pos-card-thumb">' +
 					'<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(site.siteName) + '" />' +
@@ -507,7 +548,7 @@
 				overlayHtml +
 				'<div class="pos-card-info">' +
 					'<div class="pos-card-name">' + displayName + '</div>' +
-					(appInfo ? '<div class="pos-card-ip">' + escapeHtml(appInfo.ip) + (appInfo.port ? ':' + escapeHtml(appInfo.port) : '') + '</div>' : '') +
+					ipDisplay +
 				'</div>';
 
 			// Click behavior depends on manage mode
@@ -525,7 +566,7 @@
 				var liveStatus = state.siteStatuses[site.siteCode];
 
 				// Block if no IP for this app
-				if (!appInfo || !appInfo.ip) {
+				if (!appInfo || !appInfo.ip || appInfo.ip === '0.0.0.0') {
 					showToast('IP tidak tersedia untuk ' + state.currentApp.toUpperCase() + ' di site ini', 'error');
 					return;
 				}
@@ -581,9 +622,9 @@
 	function getBestIpForSite(site) {
 		if (!site.ips || site.ips.length === 0) return null;
 		var preferred = getAppInfo(site, state.currentApp);
-		if (preferred && preferred.ip) return preferred;
+		if (preferred && preferred.ip && preferred.ip !== '0.0.0.0') return preferred;
 		for (var i = 0; i < site.ips.length; i++) {
-			if (site.ips[i].ip) return site.ips[i];
+			if (site.ips[i].ip && site.ips[i].ip !== '0.0.0.0') return site.ips[i];
 		}
 		return null;
 	}
