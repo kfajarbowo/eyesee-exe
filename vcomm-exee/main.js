@@ -245,36 +245,51 @@ if (originsToWhitelist.length > 0) {
 function setupPermissionHandlers() {
 	const ses = session.defaultSession;
 
-	// Handle permission requests (kamera, mikrofon, dll.)
-	ses.setPermissionRequestHandler((webContents, permission, callback) => {
-		const allowedPermissions = [
-			'media',           // kamera & mikrofon
-			'mediaKeySystem',  // encrypted media
-			'notifications',   // notifikasi
-			'fullscreen',      // fullscreen
-		];
+	const allowedPermissions = [
+		'media',           // kamera & mikrofon
+		'mediaKeySystem',  // encrypted media
+		'notifications',   // notifikasi
+		'fullscreen',      // fullscreen
+	];
 
-		if (allowedPermissions.includes(permission)) {
-			console.log('[Permission] Granted:', permission);
-			callback(true);
-		} else {
-			console.log('[Permission] Denied:', permission);
-			callback(false);
+	function applyPermissionHandlers(ses, label) {
+		ses.setPermissionRequestHandler((webContents, permission, callback) => {
+			if (allowedPermissions.includes(permission)) {
+				console.log(`[Permission:${label}] Granted:`, permission);
+				callback(true);
+			} else {
+				console.log(`[Permission:${label}] Denied:`, permission);
+				callback(false);
+			}
+		});
+
+		ses.setPermissionCheckHandler((webContents, permission) => {
+			return allowedPermissions.includes(permission);
+		});
+	}
+
+	// 1) Apply to default session
+	applyPermissionHandlers(session.defaultSession, 'default');
+
+	// 2) Apply to all new webContents (including <webview>) & Clear Cache
+	app.on('web-contents-created', async (event, contents) => {
+		if (contents.getType() === 'webview') {
+			try {
+				await contents.session.clearStorageData({
+					storages: ['serviceworkers', 'cachestorage'],
+				});
+				await contents.session.clearCache();
+				console.log('[App] Service Worker & cache cleared for webview');
+			} catch (err) {
+				console.warn('[App] Failed to clear webview cache:', err.message);
+			}
+
+			// Apply permissions to webview
+			applyPermissionHandlers(contents.session, 'webview');
 		}
 	});
 
-	// Handle permission checks (synchronous)
-	ses.setPermissionCheckHandler((webContents, permission) => {
-		const allowedPermissions = [
-			'media',
-			'mediaKeySystem',
-			'notifications',
-			'fullscreen',
-		];
-		return allowedPermissions.includes(permission);
-	});
-
-	console.log('[App] Permission handlers configured — media access enabled');
+	console.log('[App] Permission handlers configured — media access enabled for all sessions');
 }
 
 /**

@@ -40,6 +40,17 @@ webview.addEventListener('dom-ready', () => {
 	console.log('Webview is ready');
 });
 
+// Handle permission requests from the webview (CRITICAL for WebRTC)
+// The webview DOM element gates permissions. Even if the main process allows it,
+// the embedder (renderer) must explicitly allow it here.
+webview.addEventListener('permissionrequest', (e) => {
+	console.log('Webview requested permission:', e.permission);
+	const allowed = ['media', 'fullscreen', 'display-capture', 'notifications'];
+	if (allowed.includes(e.permission)) {
+		e.request.allow();
+	}
+});
+
 webview.addEventListener('did-fail-load', event => {
 	console.error('Failed to load:', event);
 });

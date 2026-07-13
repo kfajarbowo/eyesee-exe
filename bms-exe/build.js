@@ -134,6 +134,17 @@ function build(platform) {
 
 		if (outputFolder) {
 			copyExtraFiles(outputFolder);
+
+			// Inject ffmpeg.dll into the built app executable folder
+			const ffmpegDll = path.join(__dirname, 'node_modules', 'electron', 'dist', 'ffmpeg.dll');
+			const targetDll = path.join(outputFolder, 'ffmpeg.dll');
+			if (fs.existsSync(ffmpegDll)) {
+				fs.copyFileSync(ffmpegDll, targetDll);
+				console.log('  ✅ Copied: ffmpeg.dll');
+			} else {
+				console.warn('  ⚠️  ffmpeg.dll not found in electron dist, skipping');
+			}
+
 			console.log(`\n📦 Output: ${outputFolder}`);
 		} else {
 			console.warn('⚠️  Could not find output folder for extra files.');

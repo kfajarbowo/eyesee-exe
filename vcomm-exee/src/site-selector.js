@@ -85,7 +85,11 @@ class SiteSelector {
 	}
 
 	/**
-	 * Check if a site's server is reachable via TCP connect
+	 * Check if a site's server is reachable via HTTP HEAD request.
+	 * HTTP HEAD is used instead of TCP connect because on Windows,
+	 * TCP connect can succeed at the OS routing layer even when the
+	 * web server is not running (false-positive "Online").
+	 * HTTP HEAD actually verifies the web server is responding.
 	 * @param {Object} site - Site object with ip and port
 	 * @param {number} timeout - Timeout in ms (default 2000)
 	 * @returns {Promise<{siteCode: string, online: boolean, responseTime: number}>}
@@ -101,20 +105,26 @@ class SiteSelector {
 		}
 
 		return new Promise(resolve => {
-			const net = require('net');
 			const start = Date.now();
 
-			const socket = new net.Socket();
-			socket.setTimeout(timeout);
+			const req = http.request(
+				{
+					method: 'HEAD',
+					host: site.ip,
+					port: Number(site.port),
+					path: '/',
+					timeout,
+				},
+				(res) => {
+					const responseTime = Date.now() - start;
+					// Any HTTP response (even 4xx/5xx) means server is running
+					resolve({ siteCode: site.siteCode, online: true, responseTime });
+					res.resume(); // consume response to free socket
+				}
+			);
 
-			socket.on('connect', () => {
-				const responseTime = Date.now() - start;
-				socket.destroy();
-				resolve({ siteCode: site.siteCode, online: true, responseTime });
-			});
-
-			socket.on('timeout', () => {
-				socket.destroy();
+			req.on('timeout', () => {
+				req.destroy();
 				resolve({
 					siteCode: site.siteCode,
 					online: false,
@@ -122,8 +132,7 @@ class SiteSelector {
 				});
 			});
 
-			socket.on('error', () => {
-				socket.destroy();
+			req.on('error', () => {
 				resolve({
 					siteCode: site.siteCode,
 					online: false,
@@ -131,7 +140,7 @@ class SiteSelector {
 				});
 			});
 
-			socket.connect(Number(site.port), site.ip);
+			req.end();
 		});
 	}
 

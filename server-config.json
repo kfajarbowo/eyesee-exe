@@ -24,7 +24,10 @@
         "http://172.27.2.69:3003/api/v1/apps/eyesee",
         "http://172.27.2.101:3003/api/v1/apps/eyesee",
         "http://172.27.2.133:3003/api/v1/apps/eyesee",
-        "http://172.27.2.165:3003/api/v1/apps/eyesee"
+        "http://172.27.2.165:3003/api/v1/apps/eyesee",
+        "http://172.27.100.6:3003/api/v1/apps/eyesee",
+        "http://172.27.100.70:3003/api/v1/apps/eyesee",
+        "http://172.27.100.134:3003/api/v1/apps/eyesee"
     ],
     "dnsMap": {
         "eyesee.id": 0,

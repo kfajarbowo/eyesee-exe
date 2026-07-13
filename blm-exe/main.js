@@ -390,6 +390,23 @@ function showOfflineWarning(message) {
 // ============================================================================
 
 app.whenReady().then(() => {
+	// ── Fix: Blank screen after Docker image update ──────────────────────────
+	// Web apps served via Docker are PWAs with Service Workers.
+	// When the Docker image is replaced, the SW may serve stale cached assets
+	// (returning HTML instead of JS, causing React/Vite to fail → blank screen).
+	// Solution: clear SW + cache for EVERY webContents created (window & webview).
+	app.on('web-contents-created', async (event, contents) => {
+		try {
+			await contents.session.clearStorageData({
+				storages: ['serviceworkers', 'cachestorage'],
+			});
+			await contents.session.clearCache();
+			console.log('[App] Service Worker & cache cleared — fresh load guaranteed');
+		} catch (err) {
+			console.warn('[App] Failed to clear cache:', err.message);
+		}
+	});
+
 	initializeApp();
 
 	app.on('activate', () => {
@@ -465,11 +482,19 @@ ipcMain.handle('get-sites', async () => {
 		if (!SITE_API_URL) return { sites: [], appName: '', total: 0 };
 		
 		const rememberedIp = siteStore.get('lastSiteIp');
+		
+		// 1) Try resolved DNS URL first (if we have a remembered site IP)
 		if (rememberedIp) {
-			const resolvedApiUrl = resolveDnsMapUrl(SITE_API_URL, rememberedIp);
-			return await siteSelector.fetchSites(resolvedApiUrl);
+			try {
+				const resolvedApiUrl = resolveDnsMapUrl(SITE_API_URL, rememberedIp);
+				const result = await siteSelector.fetchSites(resolvedApiUrl);
+				if (result && result.sites && result.sites.length > 0) return result;
+			} catch (e) {
+				console.warn('[DNS] Resolved API URL gagal, mencoba fallback...', e.message);
+			}
 		}
 
+		// 2) Fallback: try all fallback API URLs in parallel
 		if (fallbackApiUrls.length > 0) {
 			console.log(`[DNS] Mencoba ${fallbackApiUrls.length} fallback API URL secara bersamaan...`);
 			const promises = fallbackApiUrls.map(url => {
@@ -491,6 +516,7 @@ ipcMain.handle('get-sites', async () => {
 			}
 		}
 
+		// 3) Last resort: try original API URL directly
 		return await siteSelector.fetchSites(SITE_API_URL);
 	} catch (error) {
 		console.error('[App] Failed to get sites:', error.message);
@@ -518,7 +544,10 @@ ipcMain.handle('select-site', async (event, siteCode, remember) => {
 	selectedWebviewUrl = siteSelector.buildSiteUrl(site);
 	console.log('[App] Site selected:', site.siteName, '→', selectedWebviewUrl);
 
-	const needsDnsRestart = dnsMap && site.ip !== injectedSiteIp;
+	// Only restart if DNS rules were previously injected with a DIFFERENT IP.
+	// If injectedSiteIp is null (first launch, no DNS rules yet), no restart needed
+	// — the app can load fine via raw IP on the first selection.
+	const needsDnsRestart = dnsMap && injectedSiteIp !== null && site.ip !== injectedSiteIp;
 
 	if (remember) {
 		siteStore.set('rememberSiteChoice', true);

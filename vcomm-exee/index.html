@@ -5,14 +5,14 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta
 			http-equiv="Content-Security-Policy"
-			content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:;"
+			content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: mediastream: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:; media-src 'self' blob: mediastream: https: http:; connect-src 'self' wss: ws: https: http:;"
 		/>
 		<title>VComm</title>
 		<link rel="stylesheet" href="assets/css/topbar.css" />
 	</head>
 	<body>
 		
-		<webview id="webview"></webview>
+		<webview id="webview" allowpopups></webview>
 
 		
 		<script src="assets/js/renderer.js"></script>

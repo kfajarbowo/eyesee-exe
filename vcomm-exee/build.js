@@ -147,6 +147,10 @@ function build(platform) {
 
 		if (outputFolder) {
 			copyExtraFiles(outputFolder, config.arch);
+			// NOTE: ffmpeg.dll is NOT copied here because VComm builds as ia32 (32-bit).
+			// electron-packager already bundles the correct ia32 ffmpeg.dll automatically.
+			// Copying from node_modules/electron/dist/ would overwrite it with x64 version,
+			// causing 0xc0000007b (architecture mismatch) error.
 			console.log(`\n📦 Output: ${outputFolder}`);
 		} else {
 			console.warn('⚠️  Could not find output folder for extra files.');
