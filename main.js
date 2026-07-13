@@ -593,15 +593,24 @@ ipcMain.handle('get-sites', async () => {
 		// 2) Fallback: try all fallback API URLs in parallel
 		if (fallbackApiUrls.length > 0) {
 			console.log(`[DNS] Mencoba ${fallbackApiUrls.length} fallback API URL secara bersamaan...`);
-			
+
+			let settled = false; // flag: setelah 1 menang, ignore sisanya
+
 			const promises = fallbackApiUrls.map(url => {
 				return new Promise(async (resolve, reject) => {
 					try {
-						const result = await siteSelector.fetchSites(url);
-						if (result && result.sites && result.sites.length > 0) {
-							resolve(result);
+						// Ambil data langsung (bypass siteSelector cache/state)
+						const raw = await siteSelector._httpGet(url);
+						const response = JSON.parse(raw);
+						if (
+							response.status === 'success' &&
+							response.data &&
+							response.data.sites &&
+							response.data.sites.length > 0
+						) {
+							resolve({ result: response.data, url });
 						} else {
-							reject(new Error("Data kosong"));
+							reject(new Error('Data kosong'));
 						}
 					} catch (e) {
 						reject(e);
@@ -610,9 +619,21 @@ ipcMain.handle('get-sites', async () => {
 			});
 
 			try {
-				const firstSuccess = await Promise.any(promises);
-				console.log(`[DNS] Sukses terhubung ke salah satu fallback API!`);
-				return firstSuccess;
+				const { result, url: winnerUrl } = await Promise.any(promises);
+				settled = true;
+				// Commit ke siteSelector SEKALI (winner saja)
+				siteSelector.sites = result.sites || [];
+				siteSelector.appName = result.appName || '';
+				siteSelector.appKey = result.appKey || '';
+				siteSelector.total = result.total || 0;
+				siteSelector.lastFetch = Date.now();
+				console.log(`[DNS] Sukses terhubung ke salah satu fallback API! (${winnerUrl})`);
+				console.log(`[SiteSelector] Fetched ${siteSelector.sites.length} sites for ${siteSelector.appName}`);
+				return {
+					sites: siteSelector.sites,
+					appName: siteSelector.appName,
+					total: siteSelector.total,
+				};
 			} catch (e) {
 				throw new Error('Semua fallback API offline atau tidak dapat dihubungi.');
 			}

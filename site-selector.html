@@ -130,6 +130,8 @@
 					} catch (error) {
 						console.error('Failed to check sites status:', error);
 					}
+					// Poll again after 10s
+					setTimeout(checkSitesStatus, 10000);
 				}
 
 				function renderSites(sites) {

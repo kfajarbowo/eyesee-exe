@@ -1,7 +1,5 @@
 {
-    "_project": "ALL SITES — Portal Center",
-    "_sites": "KEMHAN-PUSDATIN=172.27.100.5 | KEMHAN-MM=172.27.100.69 | BSSN-RAGUNAN=172.27.100.133",
-    "apiBaseUrl": "http://172.27.100.69:3003/api/v1",
+    "apiBaseUrl": "http://localhost:3003/api/v1",
     "apiKey": "clb-mstr-ip-k3y-2026",
     "appName": "Portal Center",
     "orgName": "Markas Besar",
