@@ -544,17 +544,36 @@ ipcMain.handle('get-sites', async () => {
 			const promises = fallbackApiUrls.map(url => {
 				return new Promise(async (resolve, reject) => {
 					try {
-						const result = await siteSelector.fetchSites(url);
-						if (result && result.sites && result.sites.length > 0) resolve(result);
-						else reject(new Error('Kosong'));
+						const raw = await siteSelector._httpGet(url);
+						const response = JSON.parse(raw);
+						if (
+							response.status === 'success' &&
+							response.data &&
+							response.data.sites &&
+							response.data.sites.length > 0
+						) {
+							resolve({ result: response.data, url });
+						} else {
+							reject(new Error('Kosong'));
+						}
 					} catch (e) { reject(e); }
 				});
 			});
 
 			try {
-				const firstSuccess = await Promise.any(promises);
-				console.log(`[DNS] Sukses terhubung ke salah satu fallback API!`);
-				return firstSuccess;
+				const { result, url: winnerUrl } = await Promise.any(promises);
+				siteSelector.sites = result.sites || [];
+				siteSelector.appName = result.appName || '';
+				siteSelector.appKey = result.appKey || '';
+				siteSelector.total = result.total || 0;
+				siteSelector.lastFetch = Date.now();
+				console.log(`[DNS] Sukses terhubung ke salah satu fallback API! (${winnerUrl})`);
+				console.log(`[SiteSelector] Fetched ${siteSelector.sites.length} sites for ${siteSelector.appName}`);
+				return {
+					sites: siteSelector.sites,
+					appName: siteSelector.appName,
+					total: siteSelector.total,
+				};
 			} catch (e) {
 				throw new Error('Semua fallback API offline');
 			}

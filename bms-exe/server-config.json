@@ -1,13 +1,13 @@
 {
     "_project": "ALL SITES — BMS",
-    "_sites": "KEMHAN-PUSDATIN=172.27.100.4 | KEMHAN-MM=172.27.100.68 | BSSN-RAGUNAN=172.27.100.132",
+    "_sites": "BLM KEMHAN-PUSDATIN=172.27.100.5 | BLM KEMHAN-MM=172.27.100.69 | BLM BSSN-RAGUNAN=172.27.100.133",
     "serverUrl": "http://blm.id:3001",
     "webviewUrl": "http://bms.id:8502",
     "siteApiUrl": "http://blm.id:3003/api/v1/apps/bms",
     "fallbackApiUrls": [
-        "http://172.27.100.4:3003/api/v1/apps/bms",
-        "http://172.27.100.68:3003/api/v1/apps/bms",
-        "http://172.27.100.132:3003/api/v1/apps/bms"
+        "http://172.27.100.5:3003/api/v1/apps/bms",
+        "http://172.27.100.69:3003/api/v1/apps/bms",
+        "http://172.27.100.133:3003/api/v1/apps/bms"
     ],
     "dnsMap": {
         "bms.id": 0,

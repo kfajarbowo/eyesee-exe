@@ -1,13 +1,13 @@
 {
     "_project": "ALL SITES — VComm",
-    "_sites": "KEMHAN-PUSDATIN=172.27.100.8 | KEMHAN-MM=172.27.100.72 | BSSN-RAGUNAN=172.27.100.136",
+    "_sites": "BLM KEMHAN-PUSDATIN=172.27.100.5 | BLM KEMHAN-MM=172.27.100.69 | BLM BSSN-RAGUNAN=172.27.100.133",
     "serverUrl": "http://blm.id:3001",
     "webviewUrl": "http://chat.id:5000",
     "siteApiUrl": "http://blm.id:3003/api/v1/apps/chat",
     "fallbackApiUrls": [
-        "http://172.27.100.8:3003/api/v1/apps/chat",
-        "http://172.27.100.72:3003/api/v1/apps/chat",
-        "http://172.27.100.136:3003/api/v1/apps/chat"
+        "http://172.27.100.5:3003/api/v1/apps/chat",
+        "http://172.27.100.69:3003/api/v1/apps/chat",
+        "http://172.27.100.133:3003/api/v1/apps/chat"
     ],
     "dnsMap": {
         "chat.id": 0,

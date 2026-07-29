@@ -7,7 +7,8 @@
     "fallbackApiUrls": [
         "http://172.27.100.5:3003/api/v1/apps/eyesee",
         "http://172.27.100.69:3003/api/v1/apps/eyesee",
-        "http://172.27.100.133:3003/api/v1/apps/eyesee"
+        "http://172.27.100.133:3003/api/v1/apps/eyesee",
+        "http://172.16.9.4:3003/api/v1/apps/eyesee"
     ],
     "dnsMap": {
         "eyesee.id": 0,
